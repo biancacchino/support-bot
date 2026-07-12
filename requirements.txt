@@ -5,7 +5,10 @@ pydantic>=2.7,<3.0
 pydantic-settings>=2.3,<3.0
 
 # Stores
-qdrant-client>=1.9,<2.0
+# Pinned to the minor that matches the qdrant image in docker-compose.yml. The
+# client warns on every call when the server is more than one minor version
+# away, and the on-disk format does not survive a jump that wide.
+qdrant-client>=1.18,<1.19
 redis>=5.0,<6.0
 
 # Embeddings + reranking. sentence-transformers ships CrossEncoder, which is

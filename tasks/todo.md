@@ -33,8 +33,8 @@ The Homebrew `docker` formula does not register the compose plugin, so `docker c
 
 - [x] 1.0 Derive the intent taxonomy from the Bitext dataset (added; the task list assumed it already existed)
 - [x] 1.1 Write 25 Northwind help-centre docs, each mapped to in-scope Bitext intents
-- [ ] 1.2 `ingestion.py` - chunking, local embedding, upsert to Qdrant with metadata
-- [ ] 1.3 CLI script or endpoint to trigger re-ingestion when docs change
+- [x] 1.2 `ingestion.py` - chunking, local embedding, upsert to Qdrant with metadata
+- [x] 1.3 CLI script or endpoint to trigger re-ingestion when docs change
 
 Scope: 8 categories, 22 intents in. 3 categories, 5 intents out (`CONTACT`, `FEEDBACK`, `SUBSCRIPTION`).
 The 5 out-of-scope intents are kept as near-miss negatives for the Phase 3 confidence gate and the Phase 11 eval.
@@ -42,6 +42,29 @@ Reasoning in `docs/intent-taxonomy.md`.
 
 Verify with `python scripts/check_kb_coverage.py`, which fails on an intent typo, an out-of-scope intent,
 or an in-scope intent with no document. Confirmed it fails on all three, not just that it passes.
+
+Ingestion verified end to end on 2026-07-12: 162 chunks from 25 documents, 384-dim, and all 8 retrieval
+smoke queries return their expected document (`scripts/ingest.py --check`).
+Re-running ingest leaves the point count at 162 rather than doubling it, and ingesting a corpus with a
+document removed pruned exactly that document's 8 points, so re-ingestion is genuinely idempotent.
+
+Three of the 8 smoke queries land their document at rank 2 or 3 rather than 1.
+That is expected at this stage and is the whole reason Phase 2 reranks: raw cosine similarity over
+chunk-level vectors puts near-neighbours (delivery vs shipping, cancelling vs cancellation fees) ahead of
+the right document often enough to matter. Recheck these ranks after the reranker lands.
+
+## Fixed along the way
+
+- `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates
+  past that, so the tail of every long chunk would have been stored in Qdrant but never embedded.
+  Now 224 plus a 32-token reserve for the `title > heading` prefix each chunk is embedded under, and
+  ingestion hard-fails rather than truncate if the budget is raised past what the model can read.
+- The Qdrant image (v1.12.1) was 6 minor versions behind the `qdrant-client` that `>=1.9,<2.0` resolved
+  to (1.18), which warned on every call. Both are now pinned to 1.18.
+  The old storage volume could not be read by the new server, so it was wiped and re-ingested.
+  Safe: the collection is derived entirely from `kb/` and rebuilds in seconds.
+- `kb/` is now bind-mounted into the app container, so 1.3 re-ingestion picks up edited docs without a
+  rebuild, which is the entire point of having it.
 
 ## Deviations from the task list
 

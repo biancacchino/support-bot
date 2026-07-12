@@ -37,8 +37,13 @@ class Settings(BaseSettings):
     rerank_top_k: int = 4
 
     kb_dir: str = "kb"
-    chunk_size_tokens: int = 400
-    chunk_overlap_tokens: int = 60
+
+    # all-MiniLM-L6-v2 reads at most 256 tokens and silently truncates the rest,
+    # so the chunk budget plus its "title > heading" prefix has to fit inside
+    # that. Ingestion refuses to run if this is set too high rather than let the
+    # tail of every long chunk be stored but never embedded.
+    chunk_size_tokens: int = 224
+    chunk_overlap_tokens: int = 40
 
     log_level: str = Field(default="INFO")
 
