@@ -11,15 +11,17 @@ catching, and a green upsert log will not catch it.
 """
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from qdrant_client import QdrantClient  # noqa: E402
+from qdrant_client import AsyncQdrantClient  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
 from app.ingestion import ingest, load_chunks, load_embedder  # noqa: E402
+from app.retrieval import Retriever, build_encoder  # noqa: E402
 
 # Phrased the way a user would, not the way the documents are. Each is a
 # question the corpus should answer, paired with the document that answers it.
@@ -64,31 +66,38 @@ def dry_run(settings) -> int:
     return 0
 
 
-def check(settings) -> int:
-    """Query the ingested collection the way retrieval will, and grade it."""
-    model = load_embedder(settings)
-    client = QdrantClient(url=settings.qdrant_url)
+async def _check(settings) -> int:
+    """Query the ingested collection through the real retriever, and grade it.
+
+    Deliberately goes through app.retrieval rather than re-issuing its own
+    vector search: a check that passes against a hand-rolled copy of retrieval
+    tells you nothing about the retrieval the bot actually runs.
+    """
+    client = AsyncQdrantClient(url=settings.qdrant_url)
+    retriever = Retriever(
+        client,
+        build_encoder(settings),
+        settings.qdrant_collection,
+        settings.retrieval_top_n,
+    )
 
     print(f"\nRetrieval check ({len(SMOKE_QUERIES)} queries, expecting a hit in top {TOP_K}):\n")
     failures = 0
 
-    for query, expected in SMOKE_QUERIES:
-        vector = model.encode(query, normalize_embeddings=True).tolist()
-        hits = client.query_points(
-            collection_name=settings.qdrant_collection,
-            query=vector,
-            limit=TOP_K,
-            with_payload=True,
-        ).points
+    try:
+        for query, expected in SMOKE_QUERIES:
+            hits = await retriever.search(query, limit=TOP_K)
+            ranked = [hit.doc_id for hit in hits]
 
-        ranked = [hit.payload["doc_id"] for hit in hits]
-        if expected in ranked:
-            rank = ranked.index(expected) + 1
-            print(f"  PASS  rank {rank}  {hits[rank - 1].score:.3f}  {query}")
-        else:
-            failures += 1
-            print(f"  FAIL            {query}")
-            print(f"          expected {expected}, got {', '.join(ranked) or 'nothing'}")
+            if expected in ranked:
+                rank = ranked.index(expected) + 1
+                print(f"  PASS  rank {rank}  {hits[rank - 1].score:.3f}  {query}")
+            else:
+                failures += 1
+                print(f"  FAIL            {query}")
+                print(f"          expected {expected}, got {', '.join(ranked) or 'nothing'}")
+    finally:
+        await client.close()
 
     print()
     if failures:
@@ -96,6 +105,10 @@ def check(settings) -> int:
         return 1
     print(f"All {len(SMOKE_QUERIES)} queries retrieved their document.")
     return 0
+
+
+def check(settings) -> int:
+    return asyncio.run(_check(settings))
 
 
 def main() -> int:

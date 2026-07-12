@@ -1,8 +1,16 @@
 # Support Bot - Build Progress
 
-Tracking the phases from the build task list.
+Tracking the phases from the build task list, now saved at `tasks/build-tasks.md`.
 Source docs (`prd-full.md`, `support-bot-spec.md`) were not present in the repo.
 Folder layout is reconstructed from the module names the task list itself names, per Bianca's call on 2026-07-12.
+
+## The task list itself was recovered
+
+2026-07-12. The 12-phase task list had only ever been pasted into a session, never committed, so it was one `/clear` away from being as lost as the PRD.
+Recovered verbatim from the session transcript and committed as `tasks/build-tasks.md`. It is no longer session-only.
+
+Recovering it corrected an error in these notes: Phase 2 is stage-1 vector search and Phase 3 is reranking *and* the confidence gate.
+The notes below had those merged, and had the confidence gate under Phase 3 for the right reason but the wrong phase number.
 
 ## Known gaps from the missing docs
 
@@ -49,9 +57,37 @@ Re-running ingest leaves the point count at 162 rather than doubling it, and ing
 document removed pruned exactly that document's 8 points, so re-ingestion is genuinely idempotent.
 
 Three of the 8 smoke queries land their document at rank 2 or 3 rather than 1.
-That is expected at this stage and is the whole reason Phase 2 reranks: raw cosine similarity over
+That is expected at this stage and is the whole reason Phase 3 reranks: raw cosine similarity over
 chunk-level vectors puts near-neighbours (delivery vs shipping, cancelling vs cancellation fees) ahead of
 the right document often enough to matter. Recheck these ranks after the reranker lands.
+
+## Phase 2 - Retrieval (stage 1: vector search)
+
+- [x] 2.1 `retrieval.py` - embed the query, vector search Qdrant, return the top ~10 candidates
+- [x] 2.2 Unit tests against a small known doc set
+
+Acceptance: met and verified on 2026-07-12. 35 tests pass, ruff clean.
+
+The tests come in two layers. The fast ones inject a fake encoder over a hand-built 3-chunk collection and
+pin the mechanics (ordering, the limit, payload mapping, empty query, empty collection) with no model at all.
+The slow ones are the acceptance criterion itself and cannot be faked: they run the real MiniLM over the
+real 162-chunk corpus in an in-memory Qdrant, through `Retriever.search`, and assert the obviously-correct
+document survives into the top 10.
+
+Proved the acceptance tests are load-bearing rather than trusting a green run: capping the search at 1
+result instead of 10 fails 2 of the 5 acceptance queries plus 2 mechanics tests.
+The 2 that fail are exactly the queries whose document does not rank 1 on cosine similarity, which is the
+near-miss problem Phase 3 exists to fix.
+
+The acceptance tests assert recall, not rank, and that is deliberate. Pinning rank here would pin a number
+we already know is wrong for 3 of 8 smoke queries. Recall is all stage 1 owes; rank is Phase 3's job.
+
+`scripts/ingest.py --check` now runs through `app.retrieval` rather than its own copy of the vector search.
+Its premise was always "the same search the bot will use", and once the bot had a real retrieval module, a
+hand-rolled copy would have been checking the wrong thing.
+
+Stage 1 returns raw cosine similarity and nothing thresholds on it. Documented in `retrieval.py` and the
+README, because thresholding on it is the exact mistake the Phase 3 confidence gate exists to prevent.
 
 ## Fixed along the way
 

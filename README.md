@@ -29,8 +29,12 @@ Ingestion is idempotent. Chunk IDs are derived from the document, so re-running 
 ## Verify
 
 ```sh
-# chunking logic, no model download needed
+# the whole suite: chunking, retrieval mechanics, and the retrieval acceptance
+# tests (those load the real model and embed the corpus - the `slow` marker)
 docker compose run --rm -v "$PWD/tests:/srv/tests" app python -m pytest tests -q
+
+# just the fast ones, no model weights
+docker compose run --rm -v "$PWD/tests:/srv/tests" app python -m pytest tests -q -m "not slow"
 
 # the KB corpus matches the Bitext taxonomy
 docker compose exec app python scripts/check_kb_coverage.py
@@ -47,7 +51,7 @@ docker compose exec app python scripts/ingest.py --dry-run
 
 ## Repo map
 
-- `app/` - FastAPI application. `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `main.py` (entrypoint, `/health`).
+- `app/` - FastAPI application. `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `main.py` (entrypoint, `/health`).
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy).
 - `docs/` - project documentation, including the derived intent taxonomy.
@@ -62,5 +66,9 @@ Python 3.12, FastAPI, Qdrant, Redis, sentence-transformers (`all-MiniLM-L6-v2` e
 Read `docs/intent-taxonomy.md` before touching the KB or the eval. The taxonomy is derived from the Bitext dataset and is ground truth for both.
 
 The embedding model reads at most 256 tokens and silently truncates beyond that, so `chunk_size_tokens` is capped well under it. Ingestion refuses to run if the budget is set too high rather than let the tail of a chunk be stored but never embedded.
+
+Retrieval is two stages, and only the second one is allowed to judge.
+Stage 1 (`retrieval.py`) casts a wide net and returns raw cosine similarity, which is a similarity signal and not a confidence signal - an off-topic query can sit at high similarity to a document it has nothing to do with.
+Nothing thresholds on it. The confidence gate is scored on the cross-encoder in stage 2.
 
 The Qdrant image and `qdrant-client` are pinned to the same minor version. They do not tolerate drift: the client warns on every call, and the on-disk format does not survive a wide version jump.
