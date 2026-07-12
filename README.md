@@ -45,13 +45,20 @@ docker compose exec app python scripts/ingest.py --check
 
 # what would be ingested, without writing to Qdrant
 docker compose exec app python scripts/ingest.py --dry-run
+
+# the whole pipeline as a customer meets it: retrieve, rerank, gate, answer or
+# escalate. Makes a real Gemini call, so it needs GEMINI_API_KEY in .env
+docker compose exec app python scripts/ask.py "where is my order right now"
+docker compose exec app python scripts/ask.py --all
 ```
+
+`scripts/ask.py --all` is the demo. Three questions the KB answers and three it does not; the first three come back with citations, the last three escalate.
 
 `--check` is the one that matters. An ingest can report success while retrieving the wrong document for every query, and only `--check` catches that.
 
 ## Repo map
 
-- `app/` - FastAPI application. `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `main.py` (entrypoint, `/health`).
+- `app/` - FastAPI application. `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `main.py` (entrypoint, `/health`).
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy).
 - `docs/` - project documentation, including the derived intent taxonomy.
@@ -59,7 +66,9 @@ docker compose exec app python scripts/ingest.py --dry-run
 
 ## Stack
 
-Python 3.12, FastAPI, Qdrant, Redis, sentence-transformers (`all-MiniLM-L6-v2` embedding, `ms-marco-MiniLM-L-6-v2` reranker), Gemini `2.5-flash-lite` via the `google-genai` SDK.
+Python 3.12, FastAPI, Qdrant, Redis, sentence-transformers (`all-MiniLM-L6-v2` embedding, `ms-marco-MiniLM-L-6-v2` reranker), Gemini `3.1-flash-lite` via the `google-genai` SDK.
+
+The spec asked for `gemini-2.5-flash-lite`, which Google has since closed to new API keys - it still shows up in `models.list()` but calling it returns a 404, so the spec's choice is not buildable as written. `3.1-flash-lite` is the current model at the same tier. It is pinned to an explicit version rather than the `-latest` alias, because an alias that moves under you makes Phase 11's benchmark numbers unreproducible.
 
 ## Decisions
 
@@ -74,5 +83,9 @@ Nothing thresholds on it. The confidence gate is scored on the cross-encoder in 
 This is measurable, not theoretical. Gate on cosine similarity instead and the bot answers "I want to file a complaint about your service" out of the refund docs, and "what is the CEO's salary" out of the ordering docs. Gate on the reranker and both escalate. `tests/test_reranker.py` asserts exactly that, against a similarity threshold chosen to be as strict as it possibly can be while still answering every genuine query.
 
 `CONFIDENCE_THRESHOLD` is 0.35, and the number is measured. The worst genuine query scores 0.455 and the best impostor 0.084, so 0.35 sits in the gap with room either side. It is tuned on 17 queries, which is not many - Phase 11 re-tunes it on 200-300.
+
+Every answer carries a citation, and that is enforced in code rather than requested in the prompt.
+The model is shown only the reranked chunks, and what it returns is checked before it is served: an answer that cites nothing, or that cites a document it was never given, is refused and escalates.
+A fabricated citation is the worst failure available to this system - the citation is the part a customer trusts, so an invented one launders a guess into something that looks sourced - and `tests/test_llm.py` asserts the invariant structurally over every shape of model reply, not on a happy-path example.
 
 The Qdrant image and `qdrant-client` are pinned to the same minor version. They do not tolerate drift: the client warns on every call, and the on-disk format does not survive a wide version jump.
