@@ -89,6 +89,51 @@ hand-rolled copy would have been checking the wrong thing.
 Stage 1 returns raw cosine similarity and nothing thresholds on it. Documented in `retrieval.py` and the
 README, because thresholding on it is the exact mistake the Phase 3 confidence gate exists to prevent.
 
+## Phase 3 - Reranking & confidence
+
+- [x] 3.1 `reranker.py` - cross-encoder reranks the top 10, returns the top k (k=4) by rerank score
+- [x] 3.2 Confidence gate: escalate when the top rerank score is below `CONFIDENCE_THRESHOLD`
+- [x] 3.3 Tests, including the off-topic-but-similar-embedding case the gate exists for
+
+Acceptance: met and verified on 2026-07-12. 65 tests pass, 1 xfail (below), ruff clean.
+
+The required test is `test_rerank_catches_what_similarity_alone_would_answer`, and the comparison is made
+fair by construction rather than by picking a flattering threshold. A similarity-only gate does not get to
+choose a convenient number: it has to stay lenient enough to answer every genuine query, so the strictest
+one it can possibly use is the *lowest* top-1 cosine any in-scope query produces (0.358). "I want to file a
+complaint about your service" scores 0.416 on cosine, clearing even that bar, so a similarity gate answers
+it - out of `tracking-your-refund`. The reranker scores it 0.000 and escalates.
+
+Proved the gate is load-bearing by scoring it on cosine similarity instead of the reranker: 4 off-topic
+queries get answered (complaint -> refund docs, "CEO's salary" -> ordering docs, bitcoin, leave-a-review)
+and the acceptance test fails. Reverted.
+
+### Two things the measurements changed
+
+Reranking the *bare chunk text* was wrong. The cross-encoder has to read the chunk under its
+`title > heading` prefix, the same context ingestion embeds it under, or it judges a passage whose subject
+is missing and marks genuine matches down for it: "where is my order right now" went 0.346 -> 0.552, and
+the impostor "can i pay for my order in bitcoin" went 0.476 -> 0.084. `Candidate.passage` now carries it.
+
+`CONFIDENCE_THRESHOLD` of 0.5 was a guess and it was too strict: it escalated 2 of the 8 genuine queries,
+which is a 25% hit on the deflection target, silently. Now 0.35, measured - worst genuine query 0.455, best
+impostor 0.084. Tuned on 17 queries, which is not many. Phase 11 re-tunes on 200-300.
+
+### Known gaps, deliberately left visible
+
+Rerank ranks the right document 1st for 6 of 8 genuine queries, and puts it in the top-4 for 8 of 8.
+The two misses are near-neighbours (card-rejected leads with `accepted-payment-methods` over
+`payment-declined-or-failed`; cancelling-cost leads with `cancelling-an-order` over `cancellation-fees`),
+and in both the right document is 2nd and still goes to the LLM. The tests assert top-k membership, not
+rank 1, because top-k is what the design promises: all 4 chunks are handed to generation and any can be
+cited. Phase 11 measures rank properly as MRR, over 200-300 queries rather than 8.
+
+`test_adversarial_mixed_query_escalates` is a strict xfail, not a deleted test.
+"Can I track my order if I paid with a stolen card" is half in scope: the reranker answers the tracking half
+at 0.75 confidence out of the payments doc, and ignores the fraud. It should escalate to a human.
+Phase 12 asks specifically about adversarial input, and a quietly dropped test case is how that question
+gets answered wrongly.
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates

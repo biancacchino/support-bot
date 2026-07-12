@@ -16,11 +16,10 @@ Both use an in-memory Qdrant, so neither needs the compose stack running.
 import pytest
 from qdrant_client import AsyncQdrantClient, models
 
-from app.config import Settings
-from app.retrieval import Candidate, Retriever, build_encoder
+from app.retrieval import Candidate, Retriever
+from tests.conftest import COLLECTION, IN_SCOPE_QUERIES
 
 VECTOR_SIZE = 4
-COLLECTION = "test_kb"
 
 # Three chunks, one per axis, so "nearest" is obvious by construction.
 FIXTURE_POINTS = [
@@ -182,80 +181,9 @@ async def test_empty_query_is_rejected(populated, query):
 # --- the acceptance criterion ----------------------------------------------
 
 
-# The user's words, not the corpus's. Each is a question the KB answers, paired
-# with the document that answers it.
-OBVIOUS_QUERIES = [
-    ("where is my order right now", "tracking-your-order"),
-    ("i forgot my password and cant log in", "resetting-your-password"),
-    ("my card got rejected at checkout", "payment-declined-or-failed"),
-    ("i need to send this back, it arrived broken", "returns-and-damaged-goods"),
-    ("do you charge me for cancelling", "cancellation-fees"),
-]
-
-
-@pytest.fixture(scope="module")
-def encoded_corpus():
-    """The real KB, chunked and embedded once with the real model.
-
-    Module-scoped because loading MiniLM and encoding 160-odd chunks costs
-    seconds and every query below can share one copy of the result.
-    """
-    pytest.importorskip("sentence_transformers")
-
-    from pathlib import Path
-
-    from app.ingestion import load_chunks, load_embedder
-
-    settings = Settings(kb_dir=str(Path(__file__).resolve().parent.parent / "kb"))
-    model = load_embedder(settings)
-
-    def count_tokens(text: str) -> int:
-        return len(model.tokenizer.tokenize(text))
-
-    chunks = load_chunks(
-        Path(settings.kb_dir),
-        count_tokens,
-        settings.chunk_size_tokens,
-        settings.chunk_overlap_tokens,
-    )
-    vectors = model.encode(
-        [chunk.embed_text for chunk in chunks],
-        normalize_embeddings=True,
-        show_progress_bar=False,
-    )
-    return settings, chunks, vectors, build_encoder(settings)
-
-
-@pytest.fixture
-async def real_retriever(encoded_corpus):
-    """A Retriever over the whole corpus, in an in-memory Qdrant."""
-    settings, chunks, vectors, encoder = encoded_corpus
-
-    client = AsyncQdrantClient(location=":memory:")
-    await client.create_collection(
-        collection_name=COLLECTION,
-        vectors_config=models.VectorParams(
-            size=len(vectors[0]), distance=models.Distance.COSINE
-        ),
-    )
-    await client.upsert(
-        collection_name=COLLECTION,
-        points=[
-            models.PointStruct(
-                id=chunk.point_id, vector=vector.tolist(), payload=chunk.payload()
-            )
-            for chunk, vector in zip(chunks, vectors, strict=True)
-        ],
-        wait=True,
-    )
-
-    yield Retriever(client, encoder, COLLECTION, settings.retrieval_top_n), len(chunks)
-    await client.close()
-
-
 @pytest.mark.slow
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("query", "expected_doc"), OBVIOUS_QUERIES)
+@pytest.mark.parametrize(("query", "expected_doc"), IN_SCOPE_QUERIES)
 async def test_obvious_query_retrieves_its_document(real_retriever, query, expected_doc):
     """Phase 2 acceptance: the obviously-correct doc is in the top 10.
 
@@ -263,14 +191,12 @@ async def test_obvious_query_retrieves_its_document(real_retriever, query, expec
     puts near-neighbours (delivery vs shipping, cancelling vs cancellation fees)
     ahead of the right document often enough that pinning rank here would be
     pinning a number we already know is wrong. Getting it to rank 1 is what the
-    Phase 3 reranker is for; recall is all stage 1 owes.
+    Phase 3 reranker is for, and test_reranker.py asserts exactly that; recall is
+    all stage 1 owes.
     """
-    retriever, total_chunks = real_retriever
-
-    hits = await retriever.search(query)
+    hits = await real_retriever.search(query)
     retrieved = [hit.doc_id for hit in hits]
 
     assert expected_doc in retrieved, (
-        f"{expected_doc!r} missing from the top {len(hits)} of {total_chunks} "
-        f"chunks; got {retrieved}"
+        f"{expected_doc!r} missing from the top {len(hits)}; got {retrieved}"
     )
