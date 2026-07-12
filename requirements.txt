@@ -12,6 +12,9 @@ redis>=5.0,<6.0
 # what the reranker uses, so it covers both stages.
 sentence-transformers>=3.0,<4.0
 
+# KB frontmatter parsing (ingestion + the coverage check).
+pyyaml>=6.0,<7.0
+
 # LLM. The task list named google-generativeai, but Google ended support for
 # that SDK in 2025 in favour of google-genai. Same gemini-2.5-flash-lite
 # behind it, so nothing downstream changes.
