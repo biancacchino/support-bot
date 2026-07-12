@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 
 COPY app ./app
 COPY kb ./kb
+COPY scripts ./scripts
 
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /models \

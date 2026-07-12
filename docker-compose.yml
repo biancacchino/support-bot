@@ -11,6 +11,10 @@ services:
       # Persist the embedding + reranker weights so a restart does not
       # re-download a few hundred MB from HuggingFace.
       - models:/models
+      # The KB is baked into the image, but re-ingestion is meant to be run
+      # against edited docs. Bind-mounting means editing a doc and re-running
+      # the ingest script picks it up without a rebuild.
+      - ./kb:/srv/kb:ro
     depends_on:
       qdrant:
         condition: service_started
@@ -24,7 +28,10 @@ services:
       start_period: 30s
 
   qdrant:
-    image: qdrant/qdrant:v1.12.1
+    # Kept in step with the qdrant-client major/minor in requirements.txt. The
+    # client refuses to guarantee compatibility across a wider gap than one
+    # minor version, and warns on every call when it sees one.
+    image: qdrant/qdrant:v1.18.2
     ports:
       - "6333:6333"
     volumes:
