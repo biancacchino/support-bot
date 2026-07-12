@@ -61,6 +61,18 @@ class Candidate:
         """How this chunk is cited: the document it came from, not the chunk."""
         return self.doc_id
 
+    @property
+    def passage(self) -> str:
+        """The chunk as the reranker should read it, with its context restored.
+
+        Same shape as the text ingestion embeds, and for the same reason: a
+        chunk in isolation is often ambiguous ("That link works for 60 days"
+        does not say what link). Handing the cross-encoder the bare text makes
+        it judge a passage whose subject is missing, and it marks genuine
+        matches down for it.
+        """
+        return f"{self.title} > {self.heading}\n\n{self.text}"
+
 
 class Retriever:
     """Embeds a query and pulls the nearest chunks out of Qdrant."""
