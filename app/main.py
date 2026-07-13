@@ -2,11 +2,13 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from qdrant_client import AsyncQdrantClient
 
 from app.api import router
@@ -145,3 +147,10 @@ async def health(request: Request) -> JSONResponse:
         },
     }
     return JSONResponse(status_code=200 if healthy else 503, content=body)
+
+
+# Last, so that /chat, /health and /admin/metrics are matched before the catch-all:
+# Starlette tries routes in registration order. The page is a demo front end for the
+# API, not a second product - one file, no build step, and it reads the same JSON
+# any other client would.
+app.mount("/", StaticFiles(directory=Path(__file__).parent.parent / "web", html=True), name="web")

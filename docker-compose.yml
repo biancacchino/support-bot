@@ -7,6 +7,8 @@ services:
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Empty means /admin/metrics is open, which is the right default locally.
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
     volumes:
       # Persist the embedding + reranker weights so a restart does not
       # re-download a few hundred MB from HuggingFace.

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind Support Bot</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --line: #262b36;
+    --text: #e6e8ec;
+    --muted: #8b93a3;
+    --user: #2b3242;
+    --accent: #7aa2f7;
+    --warn: #e0af68;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7f9; --panel: #fff; --line: #e3e6eb; --text: #1a1d23;
+      --muted: #6b7280; --user: #e8ecf4; --accent: #3b6fd4; --warn: #b7791f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  main { width: 100%; max-width: 720px; }
+  header { margin-bottom: 20px; }
+  h1 { font-size: 19px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  #log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+  .turn { display: flex; }
+  .turn.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 85%; padding: 12px 14px; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  .turn.user .bubble { background: var(--user); border-color: transparent; }
+  .bubble p { margin: 0 0 8px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .meta {
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line);
+    font-size: 12.5px; color: var(--muted);
+  }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 5px; margin-bottom: 9px;
+  }
+  .tag.answered { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .tag.escalated { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .scores { margin: 6px 0 0; padding: 0; list-style: none; }
+  .scores li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+  form { display: flex; gap: 8px; }
+  input, button {
+    font: inherit; border-radius: 9px; border: 1px solid var(--line); padding: 11px 13px;
+  }
+  input { flex: 1; background: var(--panel); color: var(--text); }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { background: var(--accent); color: #fff; border-color: transparent; cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .examples { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+  .examples button {
+    background: transparent; color: var(--muted); border-color: var(--line);
+    font-size: 13px; font-weight: 400; padding: 6px 10px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Northwind Support Bot</h1>
+    <p>Answers from a help-centre knowledge base, and escalates to a human when it isn't confident. It shows you which it did, and why.</p>
+    <p style="margin-top:8px;font-size:13px;">A demo for a fictional wholesaler. What you type is sent to Google Gemini to be answered and kept for an hour so follow-up questions work, so don't paste anything real.</p>
+  </header>
+
+  <div id="log" aria-live="polite"></div>
+
+  <form id="composer">
+    <input id="message" placeholder="Ask about an order, a refund, a return..." autocomplete="off" required maxlength="2000">
+    <button type="submit">Send</button>
+  </form>
+
+  <div class="examples">
+    <button type="button" data-ask="where is my order right now">where is my order right now</button>
+    <button type="button" data-ask="how long until my refund shows up">how long until my refund shows up</button>
+    <button type="button" data-ask="do you sell replacement parts for a 1994 tractor">something the KB can't answer</button>
+  </div>
+</main>
+
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("composer");
+const input = document.getElementById("message");
+const button = form.querySelector("button");
+let conversationId = null;
+
+const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function bubble(who, html) {
+  const turn = document.createElement("div");
+  turn.className = `turn ${who}`;
+  turn.innerHTML = `<div class="bubble">${html}</div>`;
+  log.append(turn);
+  turn.scrollIntoView({ behavior: "smooth", block: "end" });
+  return turn;
+}
+
+// The escalation is the point of the demo, so it renders as its own shape: no answer
+// to show, and instead the evidence for why the bot declined.
+// Scores off the cross-encoder span orders of magnitude, and a near-miss at 0.19 and
+// a nonsense match at 0.000013 both round to "0.00". The reader is here to see the
+// difference between those two, so small scores keep a significant figure.
+const score = (n) => (n >= 0.01 ? n.toFixed(2) : n.toExponential(1));
+
+// The bot escalates for three different reasons and they are not the same event. A
+// single "sorry, a human will help" would flatten the one thing worth showing here.
+const WHY = {
+  low_confidence:
+    "Nothing in the knowledge base answers this well enough to be worth saying, so it goes to an agent instead of guessing.",
+  ungrounded:
+    "The model wrote an answer it could not point at a document for, so it was refused rather than served. A confident invention is the worst failure available here.",
+  human_owned:
+    "This conversation already belongs to a human agent, so the rest of it does too. The bot does not talk over someone mid-reply.",
+};
+
+function render(data) {
+  const confidence = `confidence ${score(data.confidence)}`;
+
+  if (data.status === "answered") {
+    const cites = (data.citations ?? []).map(escape).join(", ");
+    return `<span class="tag answered">Answered</span>
+      <p>${escape(data.answer).replace(/\n+/g, "</p><p>")}</p>
+      <div class="meta">${confidence} &middot; from ${cites || "no citation"}</div>`;
+  }
+
+  // The API returns chunks, and two chunks of one document are two rows saying the
+  // same thing. The reader wants the documents that lost, each once, best score first.
+  const best = new Map();
+  for (const s of data.retrieved ?? []) {
+    if (!best.has(s.doc_id) || best.get(s.doc_id).score < s.score) best.set(s.doc_id, s);
+  }
+  const scores = [...best.values()]
+    .sort((a, b) => b.score - a.score)
+    .map((s) => `<li><span>${escape(s.title)}</span><span>${score(s.score)}</span></li>`)
+    .join("");
+
+  return `<span class="tag escalated">Escalated to a human</span>
+    <p>${WHY[data.reason] ?? WHY.low_confidence}</p>
+    <div class="meta">${confidence} &middot; closest documents:
+      <ul class="scores">${scores}</ul>
+    </div>`;
+}
+
+async function ask(message) {
+  if (!message.trim()) return;
+  bubble("user", `<p>${escape(message)}</p>`);
+  input.value = "";
+  button.disabled = true;
+  const pending = bubble("bot", `<p style="color:var(--muted)">Thinking...</p>`);
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message, conversation_id: conversationId }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const wait = data.retry_after_seconds;
+      pending.querySelector(".bubble").innerHTML =
+        `<p>${escape(data.detail ?? "Something went wrong.")}${wait ? ` Try again in ${wait}s.` : ""}</p>`;
+      return;
+    }
+
+    conversationId = data.conversation_id;
+    pending.querySelector(".bubble").innerHTML = render(data);
+  } catch {
+    pending.querySelector(".bubble").innerHTML = `<p>Could not reach the bot.</p>`;
+  } finally {
+    button.disabled = false;
+    input.focus();
+  }
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  ask(input.value);
+});
+
+document.querySelectorAll(".examples button").forEach((b) =>
+  b.addEventListener("click", () => ask(b.dataset.ask))
+);
+</script>
+</body>
+</html>

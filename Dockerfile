@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 
 COPY app ./app
 COPY kb ./kb
+COPY web ./web
 COPY scripts ./scripts
 
 # The suite needs it: without pytest.ini, pytest falls back to asyncio_mode=strict,

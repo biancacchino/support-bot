@@ -26,6 +26,45 @@ docker compose exec app python scripts/ingest.py
 
 Ingestion is idempotent. Chunk IDs are derived from the document, so re-running overwrites the same points instead of stacking a second copy of the corpus, and chunks whose document was edited or deleted are pruned.
 
+Then open `localhost:8000` for the chat page.
+It is one static file (`web/index.html`), served by the app itself, and it is a demo front end for the API rather than a second product.
+It renders an escalation as its own shape - no answer, and instead the documents that lost and the scores they lost with - because what this bot declines to answer is the interesting half of it.
+
+## Deploy the demo
+
+The public demo runs on Cloud Run, and `scripts/deploy_cloudrun.sh` builds and ships it in one command.
+Once: a Google Cloud project with billing enabled, then `gcloud auth login` and `gcloud config set project <id>`.
+The free tier covers a demo comfortably, but the project needs a card on file to exist at all.
+
+```sh
+GEMINI_API_KEY=... ADMIN_API_KEY=... scripts/deploy_cloudrun.sh
+```
+
+The demo runs the whole stack in **one** container (`deploy/single/Dockerfile`), with Qdrant and Redis inside it - the Qdrant binary is copied out of the same image tag compose pins, so the demo and the compose stack run the same server.
+`docker-compose.yml` remains the real topology and the one local dev runs against, and the two are worth testing separately: a bug that lives in the gap between them (a missing shared library, say) is invisible to `docker compose up`.
+
+One container because the hosts that will run one for free will run exactly one.
+It is not tied to Cloud Run: it listens on `$PORT`, keeps nothing on disk, and needs nothing but two secrets in the environment.
+Cloud Run is where it runs today because its free tier scales to zero, which means a demo nobody is looking at costs nothing.
+(It was going to be a Hugging Face Space, until July 2026, when HF quietly made Docker Spaces on free hardware a PRO feature. Static Spaces are still free, and cannot run any of this.)
+
+Two things about the container are deliberate.
+The embedding and reranker weights are baked in at **build** time, because the service scales to zero and cold-starts on the next visit, and the visitor who arrives during that cold start is exactly the person the demo exists for.
+The collection is rebuilt from `kb/` at **start** time, because there is no persistent disk - it costs a few seconds on a corpus this size and it means there is no stale-index failure mode.
+
+Two secrets, passed to the deploy script and set as environment variables on the service. Neither is in the repo, and the script cannot ship them by accident: it builds from `git archive HEAD`, which is tracked files only.
+
+- `GEMINI_API_KEY`, from [AI Studio](https://aistudio.google.com/apikey).
+- `ADMIN_API_KEY`, which nobody issues: it is a secret you invent, checked against the `X-Admin-Key` header, and its only property is being unguessable. Generate one with `openssl rand -hex 32`. `/admin/metrics` is **open when it is unset**, which is fine locally and is not fine on the internet: it exposes no message content, but "how often does this bot fail" is not a number to hand out.
+
+Locally the same two live in `.env` (gitignored, see `.env.example`).
+
+Three known caveats of a public deployment, all of which follow from things `docs/open-questions.md` already says out loud.
+Rate limiting buckets on the peer IP, and behind Cloud Run's front end every request arrives from the proxy, so all visitors share one bucket - the shared upstream Gemini budget is what actually protects the quota, and it is sized for that.
+Conversation history lives in the container's own Redis, which is why the service is pinned to `--max-instances 1`: a second instance would answer follow-ups with no memory of the conversation.
+And customer text reaches Gemini and Redis un-redacted, so the page says so and asks people not to paste anything real.
+Do not set `LOG_LEVEL=DEBUG` there: DEBUG logs the query text.
+
 ## The API
 
 ```sh
@@ -148,6 +187,8 @@ docker compose run --rm -v "$PWD/scripts:/srv/scripts" -v "$PWD/eval:/srv/eval" 
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy), `ask.py` (the pipeline as a customer meets it), `sample_eval_set.py` (draw the eval set from Bitext), `eval.py` (the benchmark).
 - `eval/` - `queries.jsonl`, the frozen 320-query eval set. Committed on purpose: a benchmark that resamples every run measures something different every run.
 - `docs/` - project documentation: the derived intent taxonomy, `benchmark.md` (generated - re-run `scripts/eval.py`, do not hand-edit), and `open-questions.md` (what this does and does not do about ticketing, PII and adversarial input - read it before deploying anywhere public).
+- `web/` - `index.html`, the chat page. One file, no build step, served by the app at `/`.
+- `deploy/single/` - the whole stack in one container, for the public demo. Not the real topology; compose is.
 - `tasks/` - build progress and running notes.
 
 ## Stack
