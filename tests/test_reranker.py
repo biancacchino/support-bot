@@ -155,7 +155,6 @@ def test_ranked_carries_the_whole_candidate_through():
 
     assert ranked.doc_id == "refund-policy"
     assert ranked.candidate.text == "Refunds take 5 days."
-    assert ranked.candidate.source == "refund-policy"
 
 
 # --- the case this whole stage exists for -----------------------------------

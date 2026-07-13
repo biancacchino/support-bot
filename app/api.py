@@ -16,6 +16,7 @@ and why*. Hiding the evidence would hide the product.
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -121,7 +122,7 @@ async def chat(
             },
         )
 
-    conversation_id = body.conversation_id or _new_conversation_id()
+    conversation_id = body.conversation_id or uuid.uuid4().hex
 
     try:
         with Timer() as timer:
@@ -248,9 +249,3 @@ def _escalation_body(result: Escalated, conversation_id: str) -> ChatResponse:
             for chunk in result.chunks
         ],
     )
-
-
-def _new_conversation_id() -> str:
-    import uuid
-
-    return uuid.uuid4().hex

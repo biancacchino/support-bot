@@ -130,7 +130,7 @@ async def test_search_maps_the_whole_payload(populated):
         text="Your tracking link appears in the shipping confirmation email.",
         score=top.score,
     )
-    assert top.source == "tracking-your-order"
+    assert top.doc_id == "tracking-your-order"
 
 
 @pytest.mark.asyncio

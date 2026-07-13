@@ -2,8 +2,14 @@
 
 from functools import lru_cache
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# One turn can cost two Gemini calls: condensing the follow-up, then writing the
+# answer. The upstream budget is therefore sized in turns, not requests - spending
+# a 15-RPM budget as 15 turns would overrun it by 2x on any conversation past the
+# first turn. A constant, not a setting: it is a fact about the pipeline, and it
+# changes when the pipeline changes, not when an operator wants it to.
+GEMINI_CALLS_PER_TURN = 2
 
 
 class Settings(BaseSettings):
@@ -66,15 +72,9 @@ class Settings(BaseSettings):
     gemini_rpm: int = 15
     gemini_rpd: int = 1000
 
-    # One turn can cost two Gemini calls: condensing the follow-up, then writing
-    # the answer. The upstream budget is therefore sized in turns, not requests -
-    # spending a 15-RPM budget as 15 turns would overrun it by 2x on any
-    # conversation past the first turn.
-    gemini_calls_per_turn: int = 2
-
     @property
     def upstream_turns_per_minute(self) -> int:
-        return max(1, self.gemini_rpm // self.gemini_calls_per_turn)
+        return max(1, self.gemini_rpm // GEMINI_CALLS_PER_TURN)
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # number to hand out by default.
     admin_api_key: str = ""
 
-    log_level: str = Field(default="INFO")
+    log_level: str = "INFO"
 
 
 @lru_cache
