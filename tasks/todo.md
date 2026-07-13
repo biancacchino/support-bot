@@ -229,6 +229,51 @@ question outright because a rewrite would not parse is the worse trade.
 Tests use `fakeredis`, so they exercise the real client API (RPUSH ordering, TTL semantics) without needing
 the compose stack, which is the same bargain the in-memory Qdrant already makes.
 
+## Phase 6 - Escalation handoff payload
+
+- [x] 6.1 Escalation carries the original query, the conversation history, the top retrieved chunks
+      (including the ones below threshold) and the confidence score
+- [x] 6.2 Decided: escalation is **sticky and permanent**. Documented in the README, per the task list.
+
+Acceptance: met and verified on 2026-07-12. 108 tests pass, 1 xfail, ruff clean, and both behaviours are
+visible end to end (`scripts/ask.py --sticky`): turn 1 escalates on low confidence, and turn 2
+("where is my order right now") escalates as `human_owned` at confidence **0.469** - comfortably above the
+0.35 gate, so the bot demonstrably could have answered it and deliberately did not.
+
+### 6.2, the PRD's open question
+
+Bianca chose sticky-and-permanent from the three options. Once a conversation goes to a human it stays with
+the human, even for a turn the bot is confident about.
+
+The reasoning that decided it: re-gating each turn lets the bot start answering again while an agent is
+mid-reply, and a customer getting two voices in one thread is a worse failure than a human spending ten
+seconds on "thanks!".
+
+The cost is real and was accepted rather than hidden: trivial follow-ups after an escalation do burn agent
+time, and there is no route back to the bot inside the same conversation - it takes a new `conversation_id`.
+If that cost ever bites, the fix is a handback (an agent explicitly releasing the conversation), not
+re-gating every turn.
+
+### Answered and Escalated are different types
+
+Not one type with an `escalated=True` flag. An `Answered` cannot reach an agent's queue and an `Escalated`
+cannot reach a customer, and the type system enforces what a boolean would merely record. That is also what
+task 6.1 means by "structurally distinct".
+
+The handoff carries the chunks that *lost* - the ones below the confidence threshold. They are the evidence,
+and withholding them would hide the reason the turn escalated: an agent who can see the bot nearly matched
+the refund policy knows something quite different from one who sees that it matched nothing at all.
+
+A human-owned turn still runs retrieval, even though the bot is not allowed to answer it. The agent should
+not have to search the knowledge base by hand. It skips the LLM call, though - there is no answer to write,
+so there is no reason to spend the quota finding that out.
+
+### `app/bot.py` now owns the pipeline
+
+`scripts/ask.py` had grown its own copy of condense -> retrieve -> rerank -> gate -> answer, which would have
+drifted from whatever the Phase 7 endpoint did. `SupportBot.handle()` is now the single path, and the CLI,
+the coming API endpoint and the Phase 11 eval all call it.
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates
