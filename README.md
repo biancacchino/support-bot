@@ -79,12 +79,20 @@ Rates are `null` rather than `0` when nothing has happened yet, for the same rea
 
 Two axes, protecting two different things. Conflating them is how a free tier gets exhausted by callers who were each individually well behaved.
 
-- **Per caller** (API key if present, otherwise peer IP): 10/minute, 200/day. This is about fairness and abuse.
-- **A global upstream budget**: this is about not spending a Gemini quota we do not have. The free tier is *project-wide*, so a hundred callers each politely under their own limit will still exhaust it between them - and the hundred-and-first gets a 500 from an upstream 429 nobody was watching for.
+- **Per caller** (the peer IP): 10/minute, 200/day. This is about fairness and abuse.
+- **A global upstream budget**, per minute *and* per day: this is about not spending a Gemini quota we do not have. The free tier is *project-wide*, so a hundred callers each politely under their own limit will still exhaust it between them - and the hundred-and-first gets a 500 from an upstream 429 nobody was watching for.
 
-The upstream budget is sized in **turns, not requests**, because one turn can cost two Gemini calls (condensing the follow-up, then writing the answer). Sizing a 15 RPM budget as 15 turns would overspend it by 2x on any conversation past its first turn. So the default works out at 7 turns/minute.
+The upstream budget is sized in **turns, not requests**, because one turn can cost two Gemini calls (condensing the follow-up, then writing the answer). Sizing a 15 RPM budget as 15 turns would overspend it by 2x on any conversation past its first turn. So the default works out at 7 turns/minute and 500 turns/day.
 
-Both limits return a clean `429` with a `Retry-After` header and the same figure in the body, and a limited turn never reaches the bot - the refusal has to be cheaper than the work it prevents.
+Both axes return a clean `429` with a `Retry-After` header and the same figure in the body, and a limited turn never reaches the bot - the refusal has to be cheaper than the work it prevents.
+
+**A caller is their IP address, and nothing else.**
+`X-Forwarded-For` is not trusted, and neither is `X-API-Key`: the code used to bucket the limit on whatever `X-API-Key` string arrived, and nothing anywhere validated that string, so any caller could hit their limit and then mint a fresh allowance by typing a different one.
+Phase 12 found it, and a key nobody checks is not an identity.
+An API key can come back the day something issues and verifies them, bucketing on the identity the key *resolves to* rather than on the key itself.
+
+Note for deploying this behind a proxy: every request will arrive from the proxy's address, so all callers share one bucket.
+That needs the forwarded address plus an explicit trusted-hop config, which is a deployment decision rather than a default.
 
 `GEMINI_RPM` and `GEMINI_RPD` default to 15 and 1000, which is the conservative reading of a number Google no longer publishes per model: the docs say limits depend on the account and are shown live in [AI Studio](https://aistudio.google.com/rate-limit), and third-party trackers disagree (1,000 vs 1,500 RPD). **Check the real number for your key and set it** rather than trusting the default.
 
@@ -139,7 +147,7 @@ docker compose run --rm -v "$PWD/scripts:/srv/scripts" -v "$PWD/eval:/srv/eval" 
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy), `ask.py` (the pipeline as a customer meets it), `sample_eval_set.py` (draw the eval set from Bitext), `eval.py` (the benchmark).
 - `eval/` - `queries.jsonl`, the frozen 320-query eval set. Committed on purpose: a benchmark that resamples every run measures something different every run.
-- `docs/` - project documentation: the derived intent taxonomy, and `benchmark.md` (generated - re-run `scripts/eval.py`, do not hand-edit).
+- `docs/` - project documentation: the derived intent taxonomy, `benchmark.md` (generated - re-run `scripts/eval.py`, do not hand-edit), and `open-questions.md` (what this does and does not do about ticketing, PII and adversarial input - read it before deploying anywhere public).
 - `tasks/` - build progress and running notes.
 
 ## Stack

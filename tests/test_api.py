@@ -81,6 +81,7 @@ def generous(redis) -> TurnLimiter:
         per_minute=RateLimiter(redis, 100, 60, "client-minute"),
         per_day=RateLimiter(redis, 1000, 86_400, "client-day"),
         upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, 1000, 86_400, "upstream-day"),
     )
 
 
@@ -186,6 +187,7 @@ async def test_over_the_limit_is_a_clean_429_with_a_retry_after(redis):
         per_minute=RateLimiter(redis, 1, 60, "client-minute"),
         per_day=RateLimiter(redis, 100, 86_400, "client-day"),
         upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, 1000, 86_400, "upstream-day"),
     )
     app = build_app(StubBot(), stingy)
 
@@ -205,6 +207,7 @@ async def test_a_rate_limited_turn_never_reaches_the_bot(redis):
         per_minute=RateLimiter(redis, 1, 60, "client-minute"),
         per_day=RateLimiter(redis, 100, 86_400, "client-day"),
         upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, 1000, 86_400, "upstream-day"),
     )
     app = build_app(bot, stingy)
 
@@ -215,18 +218,48 @@ async def test_a_rate_limited_turn_never_reaches_the_bot(redis):
 
 
 @pytest.mark.asyncio
-async def test_api_keys_are_limited_independently(redis):
-    """A caller cannot consume another API-key holder's per-caller allowance."""
+async def test_a_made_up_api_key_does_not_buy_a_fresh_allowance(redis):
+    """The rate limit must not be bypassable by inventing a header.
+
+    This test used to assert the opposite, and passed: client_identity bucketed on
+    the value of X-API-Key, and *nothing anywhere validated that key against
+    anything*. So a caller who hit their limit could send a different random string
+    on the next request and get a clean bucket, indefinitely. The limits were
+    decorative for anyone who read the code.
+
+    Both requests below come from the same peer, so both count against the same
+    bucket no matter what headers they carry, and the second one is refused.
+    """
     stingy = TurnLimiter(
         per_minute=RateLimiter(redis, 1, 60, "client-minute"),
         per_day=RateLimiter(redis, 100, 86_400, "client-day"),
         upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, 1000, 86_400, "upstream-day"),
     )
     app = build_app(StubBot(), stingy)
 
     assert (await call(app, headers={"x-api-key": "first"}, message="one")).status_code == 200
-    assert (await call(app, headers={"x-api-key": "second"}, message="two")).status_code == 200
-    assert (await call(app, headers={"x-api-key": "first"}, message="three")).status_code == 429
+    assert (await call(app, headers={"x-api-key": "second"}, message="two")).status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_the_shared_gemini_budget_is_capped_per_day_not_only_per_minute(redis):
+    """A day of individually-legal traffic must not be able to exhaust the quota.
+
+    The per-minute upstream limiter cannot hold this line on its own - 15 RPM
+    sustained is many times what 1,000 RPD allows - so `gemini_rpd` existed in the
+    config for exactly this and was read by nothing until Phase 12 found it.
+    """
+    generous_per_minute_stingy_per_day = TurnLimiter(
+        per_minute=RateLimiter(redis, 100, 60, "client-minute"),
+        per_day=RateLimiter(redis, 100, 86_400, "client-day"),
+        upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, 1, 86_400, "upstream-day"),
+    )
+    app = build_app(StubBot(), generous_per_minute_stingy_per_day)
+
+    assert (await call(app, message="one")).status_code == 200
+    assert (await call(app, message="two")).status_code == 429
 
 
 @pytest.mark.asyncio
@@ -316,6 +349,7 @@ async def test_a_rate_limited_turn_is_not_counted_as_a_turn(redis):
         per_minute=RateLimiter(redis, 1, 60, "client-minute"),
         per_day=RateLimiter(redis, 100, 86_400, "client-day"),
         upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, 1000, 86_400, "upstream-day"),
     )
     app = build_app(StubBot(), stingy, metrics)
 

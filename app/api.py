@@ -80,17 +80,25 @@ def get_metrics(request: Request) -> MetricsStore:
 
 
 def client_identity(request: Request) -> str:
-    """Who to charge this request to.
+    """Who to charge this request to: the peer address, and nothing else.
 
-    An API key if one is presented, otherwise the peer address. X-Forwarded-For is
-    deliberately *not* trusted: it is caller-controlled, so honouring it would let
-    anyone reset their own limit by inventing a header. Behind a real proxy this
-    needs the proxy's forwarded address and an explicit trusted-hop config, which
-    is a deployment decision rather than a default.
+    Every caller-controlled header is refused here, and that is the entire point.
+    This used to read X-API-Key and bucket by its value - but nothing ever validated
+    that key against anything, so any caller could send a different random string on
+    each request and get a fresh rate-limit bucket every time. The limits were
+    bypassable by anyone who noticed. It also wrote the raw key into the logs and
+    into Redis key names.
+
+    X-Forwarded-For is refused for the same reason, and always was.
+
+    An API key can come back the moment something actually issues and checks them:
+    bucket on the *identity the key resolves to*, never on the string presented.
+    Until then, a header nobody verifies is not an identity.
+
+    Deployment note: behind a proxy every request arrives from the proxy's address,
+    so all callers share one bucket. That needs the forwarded address plus an
+    explicit trusted-hop config, which is a deployment decision, not a default.
     """
-    api_key = request.headers.get("x-api-key")
-    if api_key:
-        return f"key:{api_key}"
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
 

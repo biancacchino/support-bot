@@ -562,6 +562,73 @@ It earned its place here. The scenario is now "i want to cancel my order" / "how
 where the raw follow-up retrieves the *delivery price list* at 0.063 and the condensed one reaches
 `cancellation-fees` at 0.976. The rewrite is a real one, observed against live Gemini, not invented.
 
+## Phase 12 - Full repo review
+
+Done 2026-07-13, on `chore/phase-12-review`. The task list asks for Gemini CLI as the reviewer, and that is
+what ran (`gemini-3-flash`; the free tier gives Pro a hard quota of zero). 12.1 is not answerable as written -
+it asks whether the code matches `prd-full.md`, and `prd-full.md` is lost - so the review was run against what
+the code, the README and the task list *claim* the system does, looking for places those three disagree with
+each other or with reality.
+
+Gemini's report was mostly noise. It listed every private helper with a single call site as "dead code", which
+is a description of what a function is, and its headline finding - that a human-owned turn still runs
+condensation and retrieval - is a design decision already written down at line 267 above. What it did find,
+buried in the list, was four real things, and chasing one of them down led to the actual find.
+
+**The security bug (the one worth the whole phase).** `client_identity` bucketed the rate limit on the value of
+the `X-API-Key` header, and **nothing anywhere validated that key against anything**. So a caller who hit their
+limit could send a different random string on the next request and get a clean bucket, forever. The per-caller
+limits were decorative to anyone who read the code. It also wrote the raw key into the logs and into Redis key
+names. `test_api_keys_are_limited_independently` asserted this behaviour, and passed, because the test was
+written against the implementation instead of against the threat.
+
+Fixed by deleting the key branch: a caller is their peer IP, and nothing else. The unvalidated header was the
+whole feature, so there was nothing to keep. The two tests that encoded it now assert the bypass is *closed*.
+An API key can come back when something actually issues and checks them.
+
+The upstream Gemini budget was never at risk - it is global and was still charged on every turn - so this was
+an abuse and fairness hole, not a quota one.
+
+**The quota hole was next door, though.** `gemini_rpd` sat in the config, documented, defaulted to 1000, and
+was **read by nothing**. There was an upstream budget per *minute* and none per *day*, and a per-minute limiter
+cannot enforce a daily cap: 7 turns/minute sustained is many times what 1,000 requests/day allows. A day of
+individually-legal traffic would have walked past the free tier and every turn after it would have 500'd on an
+upstream 429, with nothing in our own logs saying why. Now wired up as `upstream_turns_per_day`, with a test.
+
+**PII in the logs at default level.** Two lines wrote customer text where an aggregator would collect it:
+`SupportBot.handle` logged the condensed query at INFO when an answer came back ungrounded, and
+`Condenser.condense` logged the model's raw reply - which is a rewrite of the customer's question - at WARNING.
+Both now log ids and failure shapes. The query text is still at DEBUG in the retriever, reranker and condenser,
+which is what DEBUG is for, and `docs/open-questions.md` now says in writing not to run production at DEBUG.
+
+**`anyio` was imported and never declared.** `retrieval.py` and `reranker.py` both `from anyio import to_thread`
+to keep the models off the event loop. It arrives as a transitive dependency of starlette, which means it
+disappears the day starlette changes its mind. Declared.
+
+**A test that asserted nothing.** `test_timing_is_measured_not_guessed` asserted `elapsed_ms >= 0`, which a
+Timer returning a constant zero passes. It now sleeps a known interval and asserts the clock was actually read.
+
+### 12.3 - the three open questions
+
+Written up in full in `docs/open-questions.md`, which is the real deliverable of this phase. The question the
+PRD was asking is whether any of them is handled or ignored *silently*, and two were:
+
+- **Ticketing: ignored, now on purpose.** An escalation is serialised into the HTTP response and the request
+  ends. Nothing queues it, stores it or forwards it - if the client drops the response, the escalation is gone
+  and a customer is waiting for a human who was never told. Left that way deliberately: there is no ticketing
+  system to integrate with, and inventing a queue for a consumer that does not exist would get every choice
+  wrong. The `Escalated` payload is designed to be handed to one. Now written down instead of merely true.
+- **PII: partly handled, the rest now explicit.** Customer text reaches Gemini un-redacted (twice per turn) and
+  sits in Redis as plain-text JSON under a 1-hour TTL. Inherent to the product, but a real third-party data flow
+  that belongs in a privacy notice. The metrics store was clean already - counters only, no message content.
+- **Adversarial input: one class defended, one knowingly open.** Prompt injection fails structurally rather than
+  by asking the model nicely: `AnswerGenerator._parse` refuses any answer that is not valid JSON citing a
+  document that was actually retrieved, so a jailbroken model produces an uncited answer and the turn escalates.
+  The half-in-scope adversarial query ("can i track my order if i paid with a stolen card") still gets answered,
+  and the strict `xfail` in `test_reranker.py` holds the spot. Fixing it needs a safety classifier - a second
+  signal that is not retrieval - because no relevance score can express "relevant, and someone should still look
+  at this".
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates

@@ -19,9 +19,18 @@ sentence-transformers>=3.0,<4.0
 pyyaml>=6.0,<7.0
 
 # LLM. The task list named google-generativeai, but Google ended support for
-# that SDK in 2025 in favour of google-genai. Same gemini-2.5-flash-lite
-# behind it, so nothing downstream changes.
+# that SDK in 2025 in favour of google-genai. The model behind it is the one
+# named in app/config.py - which is no longer the gemini-2.5-flash-lite the task
+# list asked for, because Google closed that model to new API keys. See the
+# comment there; this is the SDK, not the model choice.
 google-genai>=1.0,<2.0
+
+# Retrieval and reranking both run the sentence-transformers models in a worker
+# thread via anyio.to_thread, so this is a direct import, not a transitive one.
+# It arrives anyway as a dependency of starlette - but a dependency we import
+# from and do not declare is one that disappears the day starlette changes its
+# mind, and it would take the event loop down with it.
+anyio>=4.0,<5.0
 
 # Test + lint
 # fakeredis keeps the conversation tests hermetic: they exercise the real redis
