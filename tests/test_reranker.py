@@ -15,6 +15,18 @@ from app.reranker import Ranked, Reranker, RerankResult, sigmoid
 from app.retrieval import Candidate
 from tests.conftest import IN_SCOPE_QUERIES, OFF_TOPIC_QUERIES
 
+# The price of the 0.5 confidence threshold, paid in the open.
+#
+# Phase 11 measured the gate over 320 real Bitext queries and 0.5 is the only point
+# that keeps false answers under the PRD's 2% cap. It costs deflection to do that,
+# and this is where the cost lands in the smoke set: the query scores 0.455, below
+# the gate, so a genuine question goes to a human.
+#
+# It is an explicit set rather than a deleted assertion because the cost was
+# measured once and must not grow quietly. A ninth query starting to escalate is a
+# regression, and it would be invisible if this test had simply been relaxed.
+KNOWN_LOST_DEFLECTIONS = {"i need to send this back, it arrived broken"}
+
 THRESHOLD = 0.35
 
 
@@ -268,9 +280,22 @@ async def test_genuine_queries_are_answered_from_the_right_document(
     """
     result = await real_reranker.rerank(query, await real_retriever.search(query))
 
-    assert result.escalate is False, (
-        f"escalated {query!r} at confidence {result.confidence:.3f} - that is a lost deflection"
-    )
+    if query in KNOWN_LOST_DEFLECTIONS:
+        assert result.escalate is True, (
+            f"{query!r} now clears the gate at {result.confidence:.3f}. That is good news, "
+            "but it means the accepted cost of the 0.5 threshold has changed - take it out "
+            "of KNOWN_LOST_DEFLECTIONS and say so in tasks/todo.md."
+        )
+    else:
+        assert result.escalate is False, (
+            f"escalated {query!r} at confidence {result.confidence:.3f} - that is a lost "
+            "deflection, and a new one. The cost of the threshold was measured; it is not "
+            "allowed to grow quietly."
+        )
+
+    # Regardless of the gate, the right document must still reach the top k. This is
+    # 8/8 and does not depend on the threshold - an escalated turn still hands these
+    # chunks to the human agent (see app/bot.py), so a miss here fails them too.
     assert expected_doc in {r.doc_id for r in result.ranked}, (
         f"{expected_doc!r} is not among the chunks handed to the LLM for {query!r}; "
         f"got {[r.doc_id for r in result.ranked]} - nothing can cite it now"

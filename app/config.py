@@ -42,15 +42,20 @@ class Settings(BaseSettings):
     # still land a high embedding similarity, which is the exact failure this
     # gate exists to catch.
     #
-    # 0.35 is measured, not guessed. Against the 8 in-scope smoke queries and 9
-    # off-topic ones, the worst genuine query scores 0.455 and the best impostor
-    # scores 0.084, so anything in that gap separates them; 0.35 sits inside it
-    # with room on both sides. The 0.5 this started as escalated 2 of the 8
-    # genuine queries, which would have quietly eaten the deflection target.
+    # 0.5, set by the Phase 11 eval over 320 real Bitext queries. It is the only
+    # point in the sweep that keeps false answers under the PRD's 2% cap (1.9%,
+    # 0 of 100 negatives leaked), and it costs deflection to do it: 25.0%, against
+    # a 40% target. Both numbers are in docs/benchmark.md.
     #
-    # This is tuned on 17 queries. Phase 11 re-tunes it on 200-300 Bitext ones,
-    # which is the number to trust.
-    confidence_threshold: float = 0.35
+    # This reverses Phase 3, which measured 0.35 on 17 hand-written queries and
+    # rejected 0.5 as too strict. Phase 3 was not wrong about its 17 queries; it
+    # was wrong to believe 17 queries. Real Bitext phrasing ("correct order",
+    # "i cant afford order") scores far lower on the cross-encoder than anything
+    # written by someone who already knew what the KB said.
+    #
+    # Deflection is bought back by fixing retrieval, not by lowering this. See
+    # tasks/todo.md, Phase 11.
+    confidence_threshold: float = 0.5
 
     conversation_ttl_seconds: int = 3600
 

@@ -120,6 +120,11 @@ docker compose exec app python scripts/ask.py --chat
 # an escalated conversation stays escalated: turn 2 is a question the bot
 # answers happily on its own, and does not answer here
 docker compose exec app python scripts/ask.py --sticky
+
+# the benchmark: 320 Bitext queries through retrieval, rerank and the gate.
+# Costs no Gemini quota - it measures everything decided before the LLM is reached
+docker compose run --rm -v "$PWD/scripts:/srv/scripts" -v "$PWD/eval:/srv/eval" \
+  -v "$PWD/docs:/srv/docs" app python scripts/eval.py
 ```
 
 `scripts/ask.py --all` is the demo. Three questions the KB answers and three it does not; the first three come back with citations, the last three escalate.
@@ -132,8 +137,9 @@ docker compose exec app python scripts/ask.py --sticky
 
 - `app/` - FastAPI application. `bot.py` (one turn, end to end - the pipeline everything else calls), `api.py` (`POST /chat`, `GET /admin/metrics`), `ratelimit.py` (per-caller limits + the shared upstream budget), `observability.py` (JSON logging + the metric counters), `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `conversation.py` (Redis history + query condensation), `main.py` (entrypoint, `/health`).
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
-- `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy).
-- `docs/` - project documentation, including the derived intent taxonomy.
+- `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy), `ask.py` (the pipeline as a customer meets it), `sample_eval_set.py` (draw the eval set from Bitext), `eval.py` (the benchmark).
+- `eval/` - `queries.jsonl`, the frozen 320-query eval set. Committed on purpose: a benchmark that resamples every run measures something different every run.
+- `docs/` - project documentation: the derived intent taxonomy, and `benchmark.md` (generated - re-run `scripts/eval.py`, do not hand-edit).
 - `tasks/` - build progress and running notes.
 
 ## Stack
@@ -154,7 +160,18 @@ Nothing thresholds on it. The confidence gate is scored on the cross-encoder in 
 
 This is measurable, not theoretical. Gate on cosine similarity instead and the bot answers "I want to file a complaint about your service" out of the refund docs, and "what is the CEO's salary" out of the ordering docs. Gate on the reranker and both escalate. `tests/test_reranker.py` asserts exactly that, against a similarity threshold chosen to be as strict as it possibly can be while still answering every genuine query.
 
-`CONFIDENCE_THRESHOLD` is 0.35, and the number is measured. The worst genuine query scores 0.455 and the best impostor 0.084, so 0.35 sits in the gap with room either side. It is tuned on 17 queries, which is not many - Phase 11 re-tunes it on 200-300.
+`CONFIDENCE_THRESHOLD` is 0.5, set by the Phase 11 eval over 320 real Bitext queries (`docs/benchmark.md`).
+It is the only point in the sweep that keeps false answers under the PRD's 2% cap, and it buys that by giving up deflection: 25.0% against a 40% target.
+No threshold reaches both, so the choice was which promise to keep, and the false-answer cap is a promise to a customer while deflection is a promise to a budget.
+
+This reverses an earlier decision to use 0.35, which had been tuned on 17 hand-written queries.
+Those 17 were not wrong; believing 17 queries was.
+Real customer phrasing ("correct order", "could i modify oredr") scores far lower on the cross-encoder than anything written by someone who already knew what the KB said.
+
+The honest caveat, from the same eval: **the cross-encoder is a good ranker and a poorly calibrated confidence signal.**
+`payment_issue` queries have 100% recall@4 and an MRR of 0.95, and deflect zero of ten, because every one scores below the gate.
+Sigmoid-squashing a raw logit does not make it a probability, and the threshold is being read as one.
+Deflection comes back from fixing KB coverage and calibrating the score, not from lowering this number.
 
 **Escalation is sticky and permanent.** Once a conversation goes to a human it stays with the human: every later turn escalates too, even one the bot is confident it could answer.
 
