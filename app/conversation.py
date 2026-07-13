@@ -171,7 +171,13 @@ class Condenser:
             # Retrieving on the raw follow-up is degraded, not broken: it is
             # exactly the behaviour we would have had without this feature. Fall
             # back loudly rather than failing the customer's question outright.
-            logger.warning("condensation failed, retrieving on the raw follow-up: %r", raw[:200])
+            # The model's reply is a rewrite of the customer's question, so it is
+            # customer text and does not belong in a WARNING that ships to an
+            # aggregator by default. What went wrong is the shape of the reply, and
+            # its length says as much about that as its content does. The text is
+            # still there at DEBUG for anyone who has decided to look.
+            logger.warning("condensation failed (%d chars, unparseable), retrieving on the raw follow-up", len(raw))
+            logger.debug("unparseable condensation: %r", raw[:200])
             return query
 
         logger.debug("condensed %r -> %r", query, condensed)

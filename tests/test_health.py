@@ -108,10 +108,19 @@ class Peer:
         self.host = host
 
 
-def test_an_api_key_identifies_a_caller_before_their_address_does():
+def test_an_unverified_api_key_cannot_buy_a_new_identity():
+    """This asserted the opposite until Phase 12, and it passed.
+
+    `client_identity` bucketed the rate limit on the value of X-API-Key, and nothing
+    anywhere validated that value against anything - so any caller could mint a new
+    identity, and a fresh allowance, by typing a different string. The header also
+    went into the logs and into Redis key names verbatim.
+
+    A key nobody checks is not an identity. The peer address is.
+    """
     identity = client_identity(FakeRequest({"x-api-key": "abc"}, Peer("1.2.3.4")))
 
-    assert identity == "key:abc"
+    assert identity == "ip:1.2.3.4"
 
 
 def test_without_a_key_a_caller_is_their_peer_address():

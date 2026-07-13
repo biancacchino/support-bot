@@ -88,10 +88,12 @@ class TurnLimiter:
         per_minute: RateLimiter,
         per_day: RateLimiter,
         upstream: RateLimiter,
+        upstream_day: RateLimiter,
     ) -> None:
         self._per_minute = per_minute
         self._per_day = per_day
         self._upstream = upstream
+        self._upstream_day = upstream_day
 
     async def check(self, identity: str) -> Decision:
         """Allow the turn, or return the first limit that says no.
@@ -99,11 +101,19 @@ class TurnLimiter:
         Client limits are checked before the shared upstream budget on purpose. A
         caller who is over their own limit should not get to consume a slot of a
         budget everyone else is sharing, even to be told no.
+
+        The upstream budget is guarded per minute *and* per day, because Gemini's
+        free tier is capped on both and they fail differently. The per-minute limiter
+        alone cannot hold the daily line: 15 RPM sustained is far more than 1,000 RPD
+        allows, so a day of steady, individually-legal traffic exhausts the quota and
+        every turn after it fails upstream. This was the gap - `gemini_rpd` was in the
+        config, documented, and read by nothing.
         """
         for limiter, key in (
             (self._per_minute, identity),
             (self._per_day, identity),
             (self._upstream, "global"),
+            (self._upstream_day, "global"),
         ):
             decision = await limiter.check(key)
             if not decision.allowed:

@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     def upstream_turns_per_minute(self) -> int:
         return max(1, self.gemini_rpm // GEMINI_CALLS_PER_TURN)
 
+    @property
+    def upstream_turns_per_day(self) -> int:
+        return max(1, self.gemini_rpd // GEMINI_CALLS_PER_TURN)
+
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 

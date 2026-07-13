@@ -115,7 +115,11 @@ class SupportBot:
         except UngroundedAnswer as exc:
             # The gate was confident and the model still would not ground an
             # answer. Handing over beats serving something uncited.
-            logger.info("ungrounded answer for %r, escalating: %s", condensed, exc)
+            # The query itself is not logged: it is the customer's own words, and
+            # this line runs at INFO. The conversation id is enough to find the turn.
+            logger.info(
+                "ungrounded answer, escalating conversation %s: %s", conversation_id, exc
+            )
             return await self._escalate(
                 EscalationReason.UNGROUNDED, query, condensed, result, history, conversation_id
             )

@@ -75,6 +75,9 @@ def build_limiter(redis, settings) -> TurnLimiter:
         upstream=RateLimiter(
             redis, settings.upstream_turns_per_minute, window_seconds=60, namespace="upstream-minute"
         ),
+        upstream_day=RateLimiter(
+            redis, settings.upstream_turns_per_day, window_seconds=86_400, namespace="upstream-day"
+        ),
     )
 
 

@@ -10,6 +10,7 @@ The load-bearing assertions here are about honesty, not arithmetic:
 
 import json
 import logging
+import time
 
 import pytest
 from fakeredis.aioredis import FakeRedis
@@ -70,10 +71,17 @@ def test_a_log_line_is_json_with_its_request_id(caplog):
 
 
 def test_timing_is_measured_not_guessed():
-    with Timer() as timer:
-        pass
+    """`>= 0` was the old assertion, and a Timer that returned a constant 0.0 passed it.
 
-    assert timer.elapsed_ms >= 0
+    Sleeping for a known interval is the cheapest thing that actually fails if the
+    clock is never read: the elapsed time has to be at least the sleep, and has to
+    be in milliseconds rather than seconds.
+    """
+    with Timer() as timer:
+        time.sleep(0.02)
+
+    assert timer.elapsed_ms >= 20  # not 0.02: this is milliseconds, not seconds
+    assert timer.elapsed_ms < 5_000  # and it is an interval, not a wall-clock timestamp
 
 
 def test_uvicorn_logs_go_through_the_json_formatter_too():

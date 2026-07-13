@@ -94,11 +94,14 @@ async def test_a_counter_that_lost_its_expiry_does_not_lock_the_caller_out_forev
 # --- the three limits a turn has to clear -----------------------------------
 
 
-def turn_limiter(redis, *, per_minute: int, per_day: int, upstream: int) -> TurnLimiter:
+def turn_limiter(
+    redis, *, per_minute: int, per_day: int, upstream: int, upstream_day: int = 1_000
+) -> TurnLimiter:
     return TurnLimiter(
         per_minute=RateLimiter(redis, per_minute, 60, "client-minute"),
         per_day=RateLimiter(redis, per_day, 86_400, "client-day"),
         upstream=RateLimiter(redis, upstream, 60, "upstream-minute"),
+        upstream_day=RateLimiter(redis, upstream_day, 86_400, "upstream-day"),
     )
 
 
@@ -154,3 +157,24 @@ async def test_a_client_over_their_own_limit_does_not_spend_the_shared_budget(re
 
     # The upstream budget has been charged once, not three times.
     assert await redis.get("ratelimit:upstream-minute:global") == "1"
+
+
+@pytest.mark.asyncio
+async def test_the_daily_gemini_budget_holds_when_the_per_minute_one_never_fires(redis):
+    """The gap Phase 12 found: `gemini_rpd` was configured and read by nothing.
+
+    A per-minute upstream budget cannot enforce a daily one. Traffic that never
+    trips 7 turns/minute can still walk past 1,000 requests/day quite comfortably,
+    and the failure mode is the worst kind: every turn suddenly 500s late in the day
+    because Google is refusing us, and nothing in our own logs says why.
+    """
+    tl = turn_limiter(redis, per_minute=10, per_day=100, upstream=10, upstream_day=2)
+
+    assert (await tl.check("ip:1.1.1.1")).allowed is True
+    assert (await tl.check("ip:2.2.2.2")).allowed is True
+
+    # Nobody is over their own limit, and nobody is over the per-minute budget.
+    exhausted = await tl.check("ip:3.3.3.3")
+
+    assert exhausted.allowed is False
+    assert exhausted.retry_after > 0
