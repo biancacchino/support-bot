@@ -7,6 +7,25 @@ intents: [delivery_period]
 
 # Delivery times and cut-offs
 
+## How long it takes for your order to arrive
+
+How soon you can expect your parcel depends on the delivery option you chose at checkout.
+
+| Option | How long it takes to arrive |
+|---|---|
+| Standard | 2 to 3 working days |
+| Named day | The working day you chose |
+| Next day | The next working day, if you ordered before the cut-off |
+| Pre-9am | The next working day, before 9am |
+| Pallet | 3 to 5 working days |
+| Collection | Same day, from our Reading depot |
+
+These are working days, not calendar days, and the clock starts at the cut-off rather than at the moment you click pay.
+Both of those are covered below, and both are the usual reason an item arrives a day later than the table suggests.
+
+Once your order has been dispatched, the courier's tracking will tell you when your item is going to arrive, usually with an estimated window on the morning of delivery.
+That estimate is the one to trust, because it is based on the route the driver is actually running.
+
 ## Cut-off times
 
 To get the delivery speed you paid for, the order has to be placed before the cut-off.

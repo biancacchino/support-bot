@@ -180,13 +180,16 @@ async def test_a_failed_condensation_falls_back_to_the_raw_follow_up(raw):
 # --- the acceptance criterion -----------------------------------------------
 
 
-TURN_1 = "i want a refund for a damaged item"
-TURN_2 = "how long will it take"
+TURN_1 = "i want to cancel my order"
+TURN_2 = "how much will that cost me"
+
+# The documents that genuinely answer turn 2 once it is read in context.
+CANCEL_DOCS = {"cancellation-fees", "cancelling-an-order"}
 
 # What Gemini actually returns for this follow-up, observed against the real API
 # and pinned here. The LLM is stubbed - CI does not call Gemini - but the rewrite
 # it is stubbed with is a real one, not a convenient one.
-CONDENSED_TURN_2 = "How long will it take to receive a refund for a damaged item?"
+CONDENSED_TURN_2 = "How much will it cost me to cancel my order?"
 
 
 @pytest.mark.slow
@@ -200,14 +203,20 @@ async def test_turn_two_needs_turn_one(store, real_retriever, real_reranker):
     rewriting, or a history that stopped being read, breaks this test rather than
     quietly degrading the product.
 
-    The raw follow-up is not merely worse, it is dangerous. "How long will it take"
-    retrieves account-registration chunks, clears the confidence gate at 0.373, and
-    confidently answers how long *registration* takes. The customer asked about a
-    refund. A silently wrong answer to a question nobody asked is the failure here,
-    and condensation is what removes it.
+    "How much will that cost me" is about a cancellation fee only if you have read
+    turn 1. On its own it retrieves the *delivery price list* - a document about a
+    different subject entirely - at 0.063. Condensed against the history it reaches
+    `cancellation-fees` at 0.976.
+
+    The guard below is the load-bearing part. It asserts the raw follow-up does
+    *not* already find the right document, because a control that passes by accident
+    proves nothing about the feature. It has caught a real regression once: adding a
+    "how long a refund takes" section to the KB made the previous scenario's raw
+    follow-up ("how long will it take") retrieve the refund docs unaided, which
+    quietly turned this test into one that would pass with condensation removed.
     """
     # Turn 1 happened, and is in the history.
-    await store.append("c1", turn(TURN_1, answer="Photograph the damage and raise a refund request."))
+    await store.append("c1", turn(TURN_1, answer="You can cancel from Orders while it is still Placed."))
 
     # Turn 2, condensed against that history exactly as the app does it.
     condenser = Condenser(responder(f'{{"query": "{CONDENSED_TURN_2}"}}'))
@@ -221,14 +230,14 @@ async def test_turn_two_needs_turn_one(store, real_retriever, real_reranker):
     # control, and it is what the whole feature is measured against.
     raw_result = await real_reranker.rerank(TURN_2, await real_retriever.search(TURN_2))
 
-    assert raw_result.top.doc_id not in REFUND_DOCS, (
+    assert raw_result.top.doc_id not in CANCEL_DOCS, (
         "the raw follow-up already retrieves the right document, so this test cannot "
         "prove condensation does anything - pick a follow-up that genuinely depends on turn 1"
     )
 
     assert condensed_result.escalate is False
-    assert condensed_result.top.doc_id in REFUND_DOCS, (
-        f"condensed to {retrieval_query!r} and still did not reach the refund docs - "
+    assert condensed_result.top.doc_id in CANCEL_DOCS, (
+        f"condensed to {retrieval_query!r} and still did not reach the cancellation docs - "
         f"got {condensed_result.top.doc_id}. If condensation was disabled, this is how it shows up"
     )
     assert condensed_result.confidence > raw_result.confidence

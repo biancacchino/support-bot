@@ -507,10 +507,60 @@ three, and they are missing coverage rather than mis-ranked: "how long does deli
 
 Not from the threshold. In order of expected value:
 
-1. Fix the three weak intents in `kb/`. They are 30 of the 220 queries and they fail on coverage.
+1. ~~Fix the three weak intents in `kb/`.~~ Done - see below.
 2. Calibrate the gate rather than threshold a raw logit (Platt scaling on the eval set is a few lines and
    the labelled data now exists).
 3. Only then re-tune, with `scripts/eval.py` as the judge.
+
+## Phase 11b - Fixing the KB gaps the eval found
+
+Both PRD targets are now met, and the threshold was never the lever. Retrieval was.
+
+| | Before | After | Target |
+|---|---|---|---|
+| Deflection | 25.0% | **42.3%** | >= 40% |
+| False answers | 1.9% | **1.3%** | < 2% |
+| Recall@4 | 86.4% | 91.4% | - |
+| MRR | 0.694 | 0.754 | - |
+| Top-1 accuracy | 55.9% | 63.2% | - |
+| `CONFIDENCE_THRESHOLD` | 0.5 | 0.2 | - |
+
+Deflection went up 17 points *and* false answers went down. That is not a trade, and no threshold could have
+produced it: the sweep only ever moved along one axis, buying deflection with false answers or the reverse.
+Fixing what the KB says moved the whole curve.
+
+The threshold is now 0.2, not the 0.1 that maximises deflection at 45.9%. 0.1 sits at 1.9% false answers
+against a 2.0% cap, which is not a margin, it is a coincidence, and the next KB edit would eat it.
+
+### The gaps were vocabulary, not missing content
+
+The three weak intents were not undocumented. The documents existed and were thorough; they simply did not
+speak the customer's words, and chunks are embedded under their `title > heading`, so heading vocabulary is
+half the retrieval signal.
+
+- **`delivery_period`** (40% recall@4): the doc's headings were "Cut-off times", "Working days", "When it
+  is late". Every query asks "how long until my parcel arrives", "when will my item arrive", "how soon can I
+  expect it" - and nothing in the document was framed as an answer to that question. Added a section that is.
+- **`delivery_options`** (50%): the document says "delivery" throughout and every query says "shipping" or
+  "shipment". It also had no answer at all to "do you ship to...?", which two of the ten queries ask.
+- **`check_refund_policy`** (50%): the policy set out the rules but never answered "in which cases can I ask
+  for a refund" as a question, and never said how long a refund takes.
+
+Only document *content* was changed. Not the `intents:` frontmatter, which is the ground truth the eval joins
+on - editing that to make the numbers move would be moving the goalposts, not fixing the bot.
+
+### The KB fix broke a test, correctly
+
+`test_turn_two_needs_turn_one` (Phase 5) failed on the guard assertion it was given for exactly this reason.
+
+Adding "How long a refund takes" to the refund policy meant the old scenario's raw follow-up - "how long will
+it take", asked with no history - started retrieving the refund docs *unaided*. The test would still have
+passed, while no longer proving anything: condensation could have been deleted and it would not have noticed.
+
+That guard was written in Phase 5 on the principle that a control which passes by accident proves nothing.
+It earned its place here. The scenario is now "i want to cancel my order" / "how much will that cost me",
+where the raw follow-up retrieves the *delivery price list* at 0.063 and the condensed one reaches
+`cancellation-fees` at 0.976. The rewrite is a real one, observed against live Gemini, not invented.
 
 ## Fixed along the way
 

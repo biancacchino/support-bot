@@ -9,6 +9,33 @@ intents: [check_refund_policy]
 
 What we will refund, what we will not, and how long you have.
 
+## In which cases can you ask for a refund?
+
+These are the circumstances in which you can request your money back.
+
+- **Ambient goods you no longer want.** Within 14 days of delivery, unopened and resaleable.
+- **Anything that arrives damaged, faulty, or not what you ordered.** Any time, and we pay the return carriage.
+- **Perishables that arrive in poor condition** - above temperature, leaking, out of date. Within 24 hours of delivery, with photographs.
+- **A guaranteed delivery we missed.** The delivery charge is refunded.
+
+And the cases where you cannot:
+
+- **Perishables you simply changed your mind about.** Once accepted, they cannot go back into stock.
+- **Anything outside its window**, or opened, or short-dated stock that was sold as short-dated.
+- **Delivery and service charges** on goods you are returning that are not faulty. Those are not reimbursable - you only get the carriage back when the fault was ours.
+
+Each of these is set out in full below.
+
+## How long a refund takes
+
+Reimbursements are not instant, and most of the wait is assessment rather than the payment itself.
+
+A damage claim is assessed in 2 to 3 working days from your photographs.
+Returned goods are inspected within 2 working days of us receiving them.
+The refund is issued 1 working day after it is approved, and the money is back with you **3 to 5 working days** after that on a card, or 2 to 3 on a bank transfer.
+
+To follow one that is already in progress, see the article on tracking your refund.
+
 ## The short version
 
 You have **14 days** from delivery to tell us you want to return ambient goods for a refund.

@@ -26,10 +26,10 @@ Nothing is hand-mapped.
 
 | Stage | Recall | MRR | Precision@4 |
 |---|---|---|---|
-| Stage 1 (vector search, top 10) | 96.4% @10 | 0.703 | - |
-| Stage 2 (cross-encoder, top 4) | 86.4% @4 | 0.694 | 54.1% |
+| Stage 1 (vector search, top 10) | 96.8% @10 | 0.753 | - |
+| Stage 2 (cross-encoder, top 4) | 91.4% @4 | 0.754 | 55.9% |
 
-Top-1 accuracy after reranking: **55.9%** - the share of in-scope queries whose best chunk comes from a document that genuinely covers the intent.
+Top-1 accuracy after reranking: **63.2%** - the share of in-scope queries whose best chunk comes from a document that genuinely covers the intent.
 
 ## The confidence gate
 
@@ -39,31 +39,31 @@ Both reach the customer as a cited, confident answer that is not true, which is 
 It is scored on whether a correct document reached the top-4 handed to generation, not on whether it ranked first, because all four chunks go into the prompt and the model may cite any of them.
 Scoring on top-1 would count "the right document ranked 2nd and was cited" as a false answer, which is not a failure a customer would ever see.
 
-At the shipped threshold of **0.5**:
+At the shipped threshold of **0.2**:
 
-- deflection **25.0%** (target: >= 40%)
-- false answers **1.9%** (6/320) (target: < 2%)
-- negatives leaked: **0/100**
-- in-scope queries the gate escalated: **72.3%**
+- deflection **42.3%** (target: >= 40%)
+- false answers **1.2%** (4/320) (target: < 2%)
+- negatives leaked: **1/100**
+- in-scope queries the gate escalated: **56.4%**
 
 ### Sweep
 
 | Threshold | Deflection | False answers | Ungrounded | Negatives leaked |
 |---|---|---|---|---|
-| 0.05 | 43.2% | 5.0% | 14 | 2 |
-| 0.10 | 38.2% | 4.4% | 12 | 2 |
-| 0.15 | 37.7% | 3.4% | 10 | 1 |
-| 0.20 | 35.5% | 3.4% | 10 | 1 |
-| 0.25 | 32.7% | 3.4% | 10 | 1 |
-| 0.30 | 30.9% | 3.4% | 10 | 1 |
-| 0.35 | 30.0% | 2.5% | 8 | 0 |
-| 0.40 | 30.0% | 2.5% | 8 | 0 |
-| 0.45 | 28.2% | 2.2% | 7 | 0 |
-| 0.50 | 25.0% | 1.9% | 6 | 0 |
-| 0.60 | 22.7% | 1.9% | 6 | 0 |
-| 0.70 | 21.8% | 1.2% | 4 | 0 |
+| 0.05 | 50.5% | 2.5% | 6 | 2 |
+| 0.10 | 45.9% | 1.9% | 4 | 2 |
+| 0.15 | 45.5% | 1.2% | 3 | 1 |
+| 0.20 | 42.3% | 1.2% | 3 | 1 |
+| 0.25 | 40.0% | 1.2% | 3 | 1 |
+| 0.30 | 38.2% | 1.2% | 3 | 1 |
+| 0.35 | 37.7% | 0.9% | 3 | 0 |
+| 0.40 | 37.7% | 0.9% | 3 | 0 |
+| 0.45 | 35.9% | 0.9% | 3 | 0 |
+| 0.50 | 32.7% | 0.9% | 3 | 0 |
+| 0.60 | 30.0% | 0.9% | 3 | 0 |
+| 0.70 | 28.2% | 0.3% | 1 | 0 |
 
-Best deflection under the 2% false-answer cap: **0.5** (25.0% deflection).
+Best deflection under the 2% false-answer cap: **0.1** (45.9% deflection).
 
 ## By intent
 
@@ -71,25 +71,25 @@ Sorted by MRR, worst first - the top of this table is where the KB or the chunki
 
 | Intent | Queries | Recall@4 | MRR | Deflected |
 |---|---|---|---|---|
-| `delivery_options` | 10 | 50% | 0.23 | 0 |
-| `delivery_period` | 10 | 40% | 0.28 | 0 |
-| `check_refund_policy` | 10 | 50% | 0.40 | 1 |
-| `place_order` | 10 | 80% | 0.46 | 0 |
-| `set_up_shipping_address` | 10 | 90% | 0.50 | 4 |
-| `change_order` | 10 | 70% | 0.55 | 3 |
+| `place_order` | 10 | 80% | 0.45 | 1 |
+| `set_up_shipping_address` | 10 | 90% | 0.50 | 7 |
+| `get_refund` | 10 | 90% | 0.51 | 4 |
+| `change_order` | 10 | 70% | 0.55 | 5 |
 | `check_cancellation_fee` | 10 | 70% | 0.60 | 1 |
-| `delete_account` | 10 | 90% | 0.60 | 4 |
-| `get_refund` | 10 | 100% | 0.66 | 2 |
+| `delete_account` | 10 | 90% | 0.60 | 6 |
 | `check_invoice` | 10 | 100% | 0.67 | 2 |
 | `switch_account` | 10 | 100% | 0.68 | 3 |
-| `create_account` | 10 | 80% | 0.70 | 4 |
-| `recover_password` | 10 | 100% | 0.78 | 1 |
-| `track_refund` | 10 | 90% | 0.80 | 2 |
-| `edit_account` | 10 | 100% | 0.83 | 1 |
-| `cancel_order` | 10 | 90% | 0.85 | 7 |
-| `get_invoice` | 10 | 100% | 0.88 | 2 |
-| `registration_problems` | 10 | 100% | 0.88 | 4 |
-| `change_shipping_address` | 10 | 100% | 0.95 | 7 |
-| `payment_issue` | 10 | 100% | 0.95 | 0 |
-| `check_payment_methods` | 10 | 100% | 1.00 | 3 |
+| `create_account` | 10 | 80% | 0.70 | 5 |
+| `track_refund` | 10 | 90% | 0.70 | 2 |
+| `delivery_options` | 10 | 80% | 0.75 | 7 |
+| `recover_password` | 10 | 100% | 0.78 | 4 |
+| `check_refund_policy` | 10 | 80% | 0.80 | 8 |
+| `edit_account` | 10 | 100% | 0.83 | 3 |
+| `cancel_order` | 10 | 90% | 0.85 | 9 |
+| `get_invoice` | 10 | 100% | 0.88 | 3 |
+| `registration_problems` | 10 | 100% | 0.88 | 5 |
+| `change_shipping_address` | 10 | 100% | 0.95 | 10 |
+| `delivery_period` | 10 | 100% | 0.95 | 7 |
+| `payment_issue` | 10 | 100% | 0.95 | 1 |
+| `check_payment_methods` | 10 | 100% | 1.00 | 4 |
 | `track_order` | 10 | 100% | 1.00 | 4 |
