@@ -14,6 +14,7 @@ from app.bot import SupportBot
 from app.config import get_settings
 from app.conversation import Condenser, ConversationStore
 from app.llm import AnswerGenerator, build_gemini
+from app.observability import MetricsStore, configure_logging, new_request_id, request_id_var
 from app.ratelimit import RateLimiter, TurnLimiter
 from app.reranker import Reranker, build_cross_encoder
 from app.retrieval import Retriever, build_encoder
@@ -21,13 +22,19 @@ from app.retrieval import Retriever, build_encoder
 logger = logging.getLogger(__name__)
 
 
+# At import, not in the lifespan: uvicorn logs "Started server process" and
+# "Waiting for application startup" before lifespan runs, and those lines would come
+# out as prose in an otherwise-JSON stream.
+configure_logging(get_settings().log_level)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    logging.basicConfig(level=settings.log_level)
 
     app.state.qdrant = AsyncQdrantClient(url=settings.qdrant_url)
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    app.state.metrics = MetricsStore(app.state.redis)
 
     # The models load once, here, and not on the first request. Both are hundreds
     # of MB and take seconds to warm; doing it lazily would hand that latency to
@@ -73,6 +80,25 @@ def build_limiter(redis, settings) -> TurnLimiter:
 
 app = FastAPI(title="Support Bot", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
+
+
+@app.middleware("http")
+async def tag_request(request, call_next):
+    """Give every request an id, and hand it back in the response.
+
+    A customer with a complaint has a timestamp and, if we put it in the response, an
+    id. Without one, tracing "the bot told me refunds take 30 days" back to the turn
+    that said it means grepping logs by prose.
+    """
+    request_id = request.headers.get("x-request-id") or new_request_id()
+    token = request_id_var.set(request_id)
+    try:
+        response = await call_next(request)
+    finally:
+        request_id_var.reset(token)
+
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 async def _check_qdrant(app: FastAPI) -> tuple[bool, str]:

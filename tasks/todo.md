@@ -337,6 +337,49 @@ request through is a far better failure than a silent permanent ban.
 reset their own limit by inventing a header. Behind a real proxy this needs the proxy's address and an
 explicit trusted-hop config, which is a deployment decision rather than a default.
 
+## Phase 8 - Observability
+
+- [x] 8.1 Structured logging: request id, conversation id, latency, confidence, escalated true/false
+- [x] 8.2 Admin endpoint: deflection rate, escalation rate, and rates by category
+
+Acceptance: met and verified on 2026-07-12. 144 tests pass, 1 xfail, ruff clean, and both are real against
+the running container: driving 3 turns produced `deflection_rate: 0.6667`, `mean_latency_ms: 898.2`, and one
+`low_confidence` escalation, and **17/17 log lines parse as JSON**.
+
+### False-answer rate is null, on purpose, and says why
+
+The PRD asks for false-answer rate by category. It is **not computable from live traffic**. A false answer is
+one the bot gave confidently and *wrongly*, and nothing in a request tells us it was wrong - that needs ground
+truth or a human saying so. The endpoint returns `null` plus a note pointing at Phase 11, which has labelled
+queries and is where the number actually comes from.
+
+Reporting a plausible number here, or silently redefining false-answer rate as something cheaper to measure
+(escalation rate, say), would be worse than reporting nothing, because someone would put it in a slide and
+believe it.
+
+Same reasoning, smaller stakes: rates are `null` rather than `0.0` when no traffic has arrived. A 0% deflection
+rate is an emergency and no traffic is a Tuesday, and a dashboard that renders them identically will have
+someone debugging a bot that is fine.
+
+### Escalated turns record their category
+
+Otherwise the single most useful thing the endpoint could tell you - "we keep escalating REFUND questions" - is
+exactly the thing it cannot. The category comes from the best chunk even when the turn escalated.
+
+Rate-limited requests are *not* counted as turns. They never reached the bot, so counting them would inflate
+the escalation rate with traffic the bot never saw, and make a capacity problem look like a product problem.
+
+### Two defects the end-to-end run caught
+
+Both invisible to the test suite, both found by actually reading the container's log stream:
+
+- **Uvicorn's own access lines were plain text** in an otherwise-JSON stream, so an aggregator could parse
+  neither half. Its loggers now propagate through the JSON formatter. `configure_logging` also had to move to
+  import time: uvicorn logs "Started server process" before the lifespan runs, and those lines came out as
+  prose.
+- **sentence-transformers printed a tqdm progress bar on every single query.** `show_progress_bar=False` was set
+  in ingestion but not in the query encoder, so every retrieval dumped `Batches: 100%|...` into the logs.
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates

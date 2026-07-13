@@ -130,6 +130,11 @@ def build_encoder(settings: Settings) -> Encoder:
     model = load_embedder(settings)
 
     def encode(query: str) -> Sequence[float]:
-        return model.encode(query, normalize_embeddings=True).tolist()
+        # show_progress_bar=False or sentence-transformers prints a tqdm bar to the
+        # log stream on every single query, which is noise in a terminal and garbage
+        # in a log aggregator.
+        return model.encode(
+            query, normalize_embeddings=True, show_progress_bar=False
+        ).tolist()
 
     return encode

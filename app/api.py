@@ -22,7 +22,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.bot import Answered, Escalated, SupportBot
+from app.config import get_settings
 from app.llm import UpstreamRateLimited
+from app.observability import MetricsStore, Timer, TurnMetrics
 from app.ratelimit import TurnLimiter
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,10 @@ def get_limiter(request: Request) -> TurnLimiter:
     return request.app.state.limiter
 
 
+def get_metrics(request: Request) -> MetricsStore:
+    return request.app.state.metrics
+
+
 def client_identity(request: Request) -> str:
     """Who to charge this request to.
 
@@ -88,6 +94,7 @@ async def chat(
     request: Request,
     bot: SupportBot = Depends(get_bot),
     limiter: TurnLimiter = Depends(get_limiter),
+    metrics: MetricsStore = Depends(get_metrics),
 ) -> JSONResponse:
     identity = client_identity(request)
     decision = await limiter.check(identity)
@@ -96,6 +103,10 @@ async def chat(
         # A limit is not an error the caller can fix by retrying immediately, so
         # say when they can. Retry-After is the header clients and CDNs already
         # understand; the body repeats it for anything reading JSON.
+        logger.info(
+            "rate limited",
+            extra={"fields": {"identity": identity, "retry_after": decision.retry_after}},
+        )
         return JSONResponse(
             status_code=429,
             headers={"Retry-After": str(decision.retry_after)},
@@ -108,11 +119,15 @@ async def chat(
     conversation_id = body.conversation_id or _new_conversation_id()
 
     try:
-        result = await bot.handle(body.message, conversation_id)
+        with Timer() as timer:
+            result = await bot.handle(body.message, conversation_id)
     except UpstreamRateLimited as exc:
         # Gemini refused us, not the caller. Their request was fine; we just cannot
         # serve it this second, so it is a 429 with guidance rather than a 500.
-        logger.warning("upstream rate limit hit for conversation %s", conversation_id)
+        logger.warning(
+            "upstream rate limited",
+            extra={"fields": {"conversation_id": conversation_id}},
+        )
         return JSONResponse(
             status_code=429,
             headers={"Retry-After": str(exc.retry_after)},
@@ -121,6 +136,8 @@ async def chat(
                 "retry_after_seconds": exc.retry_after,
             },
         )
+
+    await _record(metrics, result, conversation_id, timer.elapsed_ms)
 
     if isinstance(result, Answered):
         return JSONResponse(
@@ -135,6 +152,72 @@ async def chat(
         )
 
     return JSONResponse(content=_escalation_body(result, conversation_id).model_dump(exclude_none=True))
+
+
+async def _record(
+    metrics: MetricsStore,
+    result: Answered | Escalated,
+    conversation_id: str,
+    latency_ms: float,
+) -> None:
+    """One log line and one set of counters per turn.
+
+    The category comes from the best chunk even when the turn escalated: "we keep
+    escalating REFUND questions" is exactly the finding the admin endpoint exists to
+    surface, and it is unavailable if escalations are recorded without a category.
+    """
+    escalated = isinstance(result, Escalated)
+    category = _category_of(result)
+
+    logger.info(
+        "turn escalated" if escalated else "turn answered",
+        extra={
+            "fields": {
+                "conversation_id": conversation_id,
+                "escalated": escalated,
+                "reason": str(result.reason) if escalated else None,
+                "confidence": round(result.confidence, 4),
+                "category": category,
+                "latency_ms": round(latency_ms, 1),
+                "citations": None if escalated else list(result.citations),
+            }
+        },
+    )
+
+    await metrics.record(
+        TurnMetrics(
+            escalated=escalated,
+            reason=str(result.reason) if escalated else None,
+            category=category,
+            confidence=result.confidence,
+            latency_ms=latency_ms,
+        )
+    )
+
+
+def _category_of(result: Answered | Escalated) -> str | None:
+    if isinstance(result, Escalated):
+        return result.chunks[0].candidate.category if result.chunks else None
+    # An Answered cites documents; the category is the one it answered out of.
+    return result.category
+
+
+@router.get("/admin/metrics")
+async def admin_metrics(
+    request: Request,
+    metrics: MetricsStore = Depends(get_metrics),
+) -> JSONResponse:
+    """Deflection and escalation rates, overall and by category.
+
+    Gated on ADMIN_API_KEY when one is set. It exposes no message content - only
+    counts - but "how often does this bot fail" is not a number to leave open to the
+    internet by default.
+    """
+    expected = get_settings().admin_api_key
+    if expected and request.headers.get("x-admin-key") != expected:
+        return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+
+    return JSONResponse(content=await metrics.snapshot())
 
 
 def _escalation_body(result: Escalated, conversation_id: str) -> ChatResponse:

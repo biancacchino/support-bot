@@ -10,10 +10,12 @@ from fakeredis.aioredis import FakeRedis
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.api import get_bot, get_limiter, router
+from app.api import get_bot, get_limiter, get_metrics, router
 from app.bot import Answered, Escalated, EscalationReason
+from app.config import get_settings
 from app.conversation import Turn
 from app.llm import UpstreamRateLimited
+from app.observability import MetricsStore
 from app.ratelimit import RateLimiter, TurnLimiter
 from app.reranker import Ranked
 from app.retrieval import Candidate
@@ -23,6 +25,7 @@ ANSWERED = Answered(
     citations=("refund-policy",),
     confidence=0.91,
     condensed_query="how long does a refund take",
+    category="REFUND",
 )
 
 ESCALATED = Escalated(
@@ -62,11 +65,12 @@ class StubBot:
         return self._result
 
 
-def build_app(bot, limiter) -> FastAPI:
+def build_app(bot, limiter, metrics: MetricsStore | None = None) -> FastAPI:
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[get_bot] = lambda: bot
     app.dependency_overrides[get_limiter] = lambda: limiter
+    app.dependency_overrides[get_metrics] = lambda: metrics or MetricsStore(FakeRedis(decode_responses=True))
     return app
 
 
@@ -193,3 +197,102 @@ async def test_gemini_refusing_us_is_a_429_and_not_a_500(redis):
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "30"
     assert "limit" in response.json()["detail"]
+
+
+# --- what the turn leaves behind --------------------------------------------
+
+
+async def get(app, path: str, headers: dict | None = None):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.get(path, headers=headers or {})
+
+
+@pytest.mark.asyncio
+async def test_an_answered_turn_is_counted(redis):
+    metrics = MetricsStore(redis)
+    app = build_app(StubBot(ANSWERED), generous(redis), metrics)
+
+    await call(app, message="how long for a refund")
+
+    snapshot = await metrics.snapshot()
+    assert snapshot["turns"] == 1
+    assert snapshot["deflection_rate"] == 1.0
+    assert snapshot["by_category"]["REFUND"]["answered"] == 1
+
+
+@pytest.mark.asyncio
+async def test_an_escalated_turn_is_counted_with_its_reason_and_category(redis):
+    metrics = MetricsStore(redis)
+    app = build_app(StubBot(ESCALATED), generous(redis), metrics)
+
+    await call(app, message="what is your ceo paid")
+
+    snapshot = await metrics.snapshot()
+    assert snapshot["escalation_rate"] == 1.0
+    assert snapshot["escalation_reasons"] == {"low_confidence": 1}
+    assert snapshot["by_category"]["ORDER"]["escalated"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limited_turn_is_not_counted_as_a_turn(redis):
+    """It never reached the bot, so it is not a deflection or an escalation.
+
+    Counting refusals as turns would quietly inflate the escalation rate with
+    traffic the bot never saw, and the number would look like a product problem
+    rather than a capacity one.
+    """
+    metrics = MetricsStore(redis)
+    stingy = TurnLimiter(
+        per_minute=RateLimiter(redis, 1, 60, "client-minute"),
+        per_day=RateLimiter(redis, 100, 86_400, "client-day"),
+        upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+    )
+    app = build_app(StubBot(), stingy, metrics)
+
+    await call(app, message="first")
+    await call(app, message="second")  # 429
+
+    assert (await metrics.snapshot())["turns"] == 1
+
+
+@pytest.mark.asyncio
+async def test_the_metrics_endpoint_reports_the_snapshot(redis):
+    metrics = MetricsStore(redis)
+    app = build_app(StubBot(ANSWERED), generous(redis), metrics)
+    await call(app, message="how long for a refund")
+
+    body = (await get(app, "/admin/metrics")).json()
+
+    assert body["turns"] == 1
+    assert body["deflection_rate"] == 1.0
+    assert body["false_answer_rate"] is None  # and it says why, see test_observability
+
+
+@pytest.fixture
+def admin_key(monkeypatch):
+    """Turn the admin gate on for a test, and reset the cached settings after."""
+    monkeypatch.setenv("ADMIN_API_KEY", "s3cret")
+    get_settings.cache_clear()
+    yield "s3cret"
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_the_metrics_endpoint_is_closed_when_a_key_is_configured(redis, admin_key):
+    """An untested auth check is a decorative one."""
+    app = build_app(StubBot(), generous(redis))
+
+    assert (await get(app, "/admin/metrics")).status_code == 401
+    assert (await get(app, "/admin/metrics", {"x-admin-key": "wrong"})).status_code == 401
+    assert (await get(app, "/admin/metrics", {"x-admin-key": admin_key})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_the_metrics_endpoint_is_open_when_no_key_is_configured(redis):
+    """Fine locally, and the README says not to ship it that way."""
+    get_settings.cache_clear()
+    app = build_app(StubBot(), generous(redis))
+
+    assert (await get(app, "/admin/metrics")).status_code == 200
