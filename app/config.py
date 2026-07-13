@@ -48,6 +48,34 @@ class Settings(BaseSettings):
 
     conversation_ttl_seconds: int = 3600
 
+    # Per-caller limits. About fairness and abuse, not about the Gemini quota -
+    # see below, they protect different things and conflating them is how a free
+    # tier gets exhausted by callers who were all individually well behaved.
+    rate_limit_per_minute: int = 10
+    rate_limit_per_day: int = 200
+
+    # The project-wide Gemini budget. Google no longer publishes a fixed free-tier
+    # number per model - the docs say limits depend on the account and are shown
+    # live in AI Studio (https://aistudio.google.com/rate-limit), and third-party
+    # trackers disagree with each other (1,000 vs 1,500 RPD). 15 RPM is the one
+    # figure they agree on for flash-lite, and 1,000 RPD is the conservative end of
+    # the range.
+    #
+    # So these are deliberately overridable rather than baked in: check the real
+    # number for the key in use and set it, rather than trusting this default.
+    gemini_rpm: int = 15
+    gemini_rpd: int = 1000
+
+    # One turn can cost two Gemini calls: condensing the follow-up, then writing
+    # the answer. The upstream budget is therefore sized in turns, not requests -
+    # spending a 15-RPM budget as 15 turns would overrun it by 2x on any
+    # conversation past the first turn.
+    gemini_calls_per_turn: int = 2
+
+    @property
+    def upstream_turns_per_minute(self) -> int:
+        return max(1, self.gemini_rpm // self.gemini_calls_per_turn)
+
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 

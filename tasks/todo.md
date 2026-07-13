@@ -274,6 +274,69 @@ so there is no reason to spend the quota finding that out.
 drifted from whatever the Phase 7 endpoint did. `SupportBot.handle()` is now the single path, and the CLI,
 the coming API endpoint and the Phase 11 eval all call it.
 
+## Phase 7 - Rate limiting
+
+- [x] 7.0 `POST /chat` (added; see below - the task list never numbered it)
+- [x] 7.1 Redis-backed rate limiter, per API key or per IP
+- [x] 7.2 Tuned against Gemini's actual limits rather than an assumed number
+- [x] 7.3 Graceful 429 with retry-after guidance
+
+Acceptance: met and verified on 2026-07-12. 128 tests pass, 1 xfail, ruff clean, and the limit fires over
+real HTTP against the running container: requests return 200 until the budget is spent, then a clean
+`429` with `Retry-After: 42`, never a crash or a hang.
+
+### The task list forgot the endpoint
+
+There is no numbered task anywhere in the 12 phases that builds the chat endpoint, but Phases 5, 6 and 7 all
+assume it - you cannot rate-limit an API that does not exist. Built `POST /chat` here as 7.0 and flagged it
+rather than quietly folding it into 7.1. It is very likely the missing `support-bot-spec.md` had it.
+
+### A per-IP limit does not protect the Gemini quota
+
+The thing worth saying in an interview. These protect different things and conflating them is the actual
+failure mode:
+
+- The **per-caller** limit (10/min, 200/day) is about fairness and abuse.
+- The **global upstream budget** is about not spending a quota we do not have. The Gemini free tier is
+  *project-wide*, so a hundred callers each comfortably inside their own limit still exhaust it between them.
+  Without the global limiter, the next request reaches Gemini, gets a 429 from Google, and turns into a 500
+  for a customer who did nothing wrong. `test_the_shared_upstream_budget_stops_polite_callers_from_exhausting_gemini`
+  is that scenario, written down.
+
+The upstream budget is sized in **turns, not requests**, because one turn can cost two Gemini calls: condense
+the follow-up, then write the answer. Sizing a 15 RPM budget as 15 turns would overspend it 2x on any
+conversation past the first turn. 15 // 2 = 7 turns/minute, and that is exactly what bit in the live test.
+
+### 7.2, honestly
+
+The task list says to check the real limits rather than hardcode an assumed number. Checked: **Google no
+longer publishes a fixed free-tier RPM/RPD per model.** The docs say limits depend on the account and are
+shown live in AI Studio, and third-party trackers contradict each other (1,000 vs 1,500 RPD). 15 RPM is the
+one figure they agree on for flash-lite.
+
+So the honest implementation is not a hardcoded number at all: `GEMINI_RPM` / `GEMINI_RPD` are settings with
+conservative defaults (15 / 1000), documented as needing to be set from the real value for the key in use.
+Bianca should confirm hers at https://aistudio.google.com/rate-limit.
+
+### Two 429s, for two different reasons
+
+Being over *our* limit and Gemini being over *its* limit are different events, and both must be a clean 429
+with `Retry-After` rather than a 500. The second one is the sneaky one: our budget exists to prevent it, but
+the quota is shared with anything else using the same key, so it can still happen. `UpstreamRateLimited`
+carries it out of `llm.py` and the endpoint turns it into "the assistant is briefly over its usage limit",
+not a stack trace.
+
+A rate-limited turn never reaches the bot: the refusal has to be cheaper than the work it prevents, which is
+the entire point of having one.
+
+The limiter fails **open**, not closed. A counter that lost its TTL (a crash between INCR and EXPIRE) would
+otherwise count up forever and ban a caller permanently. It restores the expiry instead. Letting one extra
+request through is a far better failure than a silent permanent ban.
+
+`X-Forwarded-For` is deliberately not trusted: it is caller-controlled, so honouring it would let anyone
+reset their own limit by inventing a header. Behind a real proxy this needs the proxy's address and an
+explicit trusted-hop config, which is a deployment decision rather than a default.
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates
@@ -295,3 +358,5 @@ the coming API endpoint and the Phase 11 eval all call it.
   That model is closed to new API keys and returns 404 on every call, so the spec is not buildable as
   written. Same tier, current, and pinned to an explicit version rather than a `-latest` alias.
 - Knowledge base corpus lives in `kb/`, not `docs/`, so it does not collide with project documentation.
+- `POST /chat` was built in Phase 7 as task 7.0. No numbered task in the task list ever creates it, yet
+  Phases 5-7 all depend on it existing. Presumably it lived in the missing `support-bot-spec.md`.

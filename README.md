@@ -26,6 +26,44 @@ docker compose exec app python scripts/ingest.py
 
 Ingestion is idempotent. Chunk IDs are derived from the document, so re-running overwrites the same points instead of stacking a second copy of the corpus, and chunks whose document was edited or deleted are pruned.
 
+## The API
+
+```sh
+curl -s -X POST localhost:8000/chat -H 'content-type: application/json' \
+  -d '{"message": "where is my order right now"}'
+```
+
+An answer and an escalation are different response shapes, discriminated by `status`, because they are different events.
+A client that forgets to check a boolean flag would happily render an escalation's empty answer field; a client that forgets to check `status` here has nothing to render at all, which is the failure we want.
+
+```jsonc
+// answered
+{"status": "answered", "conversation_id": "...", "confidence": 0.55,
+ "answer": "You can track your order by...", "citations": ["tracking-your-order"]}
+
+// escalated - no answer field exists to render
+{"status": "escalated", "conversation_id": "...", "confidence": 0.03,
+ "reason": "low_confidence", "history": [...],
+ "retrieved": [{"doc_id": "placing-an-order", "title": "Placing an order", "score": 0.03}]}
+```
+
+Pass a `conversation_id` back to make the next turn a follow-up. Omit it and a new conversation is minted.
+
+The escalation carries the retrieved chunks and their scores - the ones that scored *below* the gate. In production that payload belongs in the ticketing system rather than in a customer's browser, but it is returned here because the interesting thing about this bot is what it declines to answer and why, and hiding the evidence would hide the product.
+
+## Rate limiting
+
+Two axes, protecting two different things. Conflating them is how a free tier gets exhausted by callers who were each individually well behaved.
+
+- **Per caller** (API key if present, otherwise peer IP): 10/minute, 200/day. This is about fairness and abuse.
+- **A global upstream budget**: this is about not spending a Gemini quota we do not have. The free tier is *project-wide*, so a hundred callers each politely under their own limit will still exhaust it between them - and the hundred-and-first gets a 500 from an upstream 429 nobody was watching for.
+
+The upstream budget is sized in **turns, not requests**, because one turn can cost two Gemini calls (condensing the follow-up, then writing the answer). Sizing a 15 RPM budget as 15 turns would overspend it by 2x on any conversation past its first turn. So the default works out at 7 turns/minute.
+
+Both limits return a clean `429` with a `Retry-After` header and the same figure in the body, and a limited turn never reaches the bot - the refusal has to be cheaper than the work it prevents.
+
+`GEMINI_RPM` and `GEMINI_RPD` default to 15 and 1000, which is the conservative reading of a number Google no longer publishes per model: the docs say limits depend on the account and are shown live in [AI Studio](https://aistudio.google.com/rate-limit), and third-party trackers disagree (1,000 vs 1,500 RPD). **Check the real number for your key and set it** rather than trusting the default.
+
 ## Verify
 
 ```sh
@@ -68,7 +106,7 @@ docker compose exec app python scripts/ask.py --sticky
 
 ## Repo map
 
-- `app/` - FastAPI application. `bot.py` (one turn, end to end - the pipeline everything else calls), `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `conversation.py` (Redis history + query condensation), `main.py` (entrypoint, `/health`).
+- `app/` - FastAPI application. `bot.py` (one turn, end to end - the pipeline everything else calls), `api.py` (`POST /chat`), `ratelimit.py` (per-caller limits + the shared upstream budget), `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `conversation.py` (Redis history + query condensation), `main.py` (entrypoint, `/health`).
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy).
 - `docs/` - project documentation, including the derived intent taxonomy.
