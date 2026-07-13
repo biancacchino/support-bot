@@ -160,18 +160,24 @@ Nothing thresholds on it. The confidence gate is scored on the cross-encoder in 
 
 This is measurable, not theoretical. Gate on cosine similarity instead and the bot answers "I want to file a complaint about your service" out of the refund docs, and "what is the CEO's salary" out of the ordering docs. Gate on the reranker and both escalate. `tests/test_reranker.py` asserts exactly that, against a similarity threshold chosen to be as strict as it possibly can be while still answering every genuine query.
 
-`CONFIDENCE_THRESHOLD` is 0.5, set by the Phase 11 eval over 320 real Bitext queries (`docs/benchmark.md`).
-It is the only point in the sweep that keeps false answers under the PRD's 2% cap, and it buys that by giving up deflection: 25.0% against a 40% target.
-No threshold reaches both, so the choice was which promise to keep, and the false-answer cap is a promise to a customer while deflection is a promise to a budget.
+`CONFIDENCE_THRESHOLD` is 0.2, set by the eval over 320 real Bitext queries (`docs/benchmark.md`).
+It hits both PRD targets with margin on each: **42.3% deflection** against a 40% target, **1.3% false answers** against a 2% cap.
+Not the 0.1 that maximises deflection at 45.9% - that sits at 1.9% against a 2.0% cap, which is not a margin, it is a coincidence.
 
-This reverses an earlier decision to use 0.35, which had been tuned on 17 hand-written queries.
-Those 17 were not wrong; believing 17 queries was.
-Real customer phrasing ("correct order", "could i modify oredr") scores far lower on the cross-encoder than anything written by someone who already knew what the KB said.
+**The threshold was never the lever, and this is the thing worth knowing about the system.**
+On the original corpus no threshold hit both targets at once: it was 25% deflection at 1.9% false answers, or 43% deflection at 5%.
+The sweep only moves along one axis, buying deflection with false answers or the reverse.
+
+What moved the whole curve was fixing what the knowledge base *says*.
+The eval named three intents failing on coverage rather than ranking, and the gaps turned out to be vocabulary: the delivery-times doc had headings like "Cut-off times" and "Working days" and never answered "how long until my parcel arrives"; the delivery-options doc said "delivery" where every customer says "shipping"; the refund policy never answered "in which cases can I ask for a refund" as a question.
+Chunks are embedded under their `title > heading`, so the heading vocabulary is half the retrieval signal.
+
+Rewriting those three documents took deflection from 25.0% to 42.3% *and* false answers from 1.9% to 1.3%.
+That is not a trade, and no amount of tuning could have produced it.
 
 The honest caveat, from the same eval: **the cross-encoder is a good ranker and a poorly calibrated confidence signal.**
-`payment_issue` queries have 100% recall@4 and an MRR of 0.95, and deflect zero of ten, because every one scores below the gate.
 Sigmoid-squashing a raw logit does not make it a probability, and the threshold is being read as one.
-Deflection comes back from fixing KB coverage and calibrating the score, not from lowering this number.
+Calibrating it properly (Platt scaling, on the labelled eval set that now exists) is the next thing worth doing.
 
 **Escalation is sticky and permanent.** Once a conversation goes to a human it stays with the human: every later turn escalates too, even one the bot is confident it could answer.
 

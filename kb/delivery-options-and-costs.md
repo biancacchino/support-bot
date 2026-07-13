@@ -7,6 +7,11 @@ intents: [delivery_options]
 
 # Delivery options and costs
 
+## What shipping methods can I choose?
+
+These are the shipping options available at checkout.
+"Delivery" and "shipping" mean the same thing here, and the shipment methods are the same whichever word the site happens to use.
+
 ## The options
 
 | Option | When it arrives | Cost |
@@ -40,6 +45,16 @@ The surcharge is per consignment, not per line, so consolidating chilled goods i
 
 A basket with both ambient and chilled goods ships as one consignment where possible.
 Where it is not, it part-dispatches, and you are only charged one delivery fee regardless.
+
+## Where we ship to, and whether we ship to you
+
+We ship anywhere in the United Kingdom, and we do not ship outside it.
+
+If you are ordering from outside the UK, you can still place the order, but it has to be delivered to a UK address.
+We do not ship to the Republic of Ireland, to Europe, or to the rest of the world, and we cannot arrange it through a freight forwarder on your behalf.
+
+Everywhere in the UK is served, but not with every option: some postcodes cost more, take an extra working day, or cannot take chilled and frozen goods at all.
+The zones below say which, and the checkout shows what is actually available for your postcode before you pay.
 
 ## Zones
 

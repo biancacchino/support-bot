@@ -15,17 +15,17 @@ from app.reranker import Ranked, Reranker, RerankResult, sigmoid
 from app.retrieval import Candidate
 from tests.conftest import IN_SCOPE_QUERIES, OFF_TOPIC_QUERIES
 
-# The price of the 0.5 confidence threshold, paid in the open.
+# Genuine queries the gate is known to escalate: the deflection the threshold costs,
+# recorded in the open rather than hidden by a relaxed assertion.
 #
-# Phase 11 measured the gate over 320 real Bitext queries and 0.5 is the only point
-# that keeps false answers under the PRD's 2% cap. It costs deflection to do that,
-# and this is where the cost lands in the smoke set: the query scores 0.455, below
-# the gate, so a genuine question goes to a human.
+# It is empty, and it took two changes to get there. At CONFIDENCE_THRESHOLD 0.5 this
+# held "i need to send this back, it arrived broken", which scored 0.455 and went to a
+# human. Fixing the KB coverage gaps the Phase 11 eval found let the threshold come
+# down to 0.2 while *improving* the false-answer rate, and the query now clears it.
 #
-# It is an explicit set rather than a deleted assertion because the cost was
-# measured once and must not grow quietly. A ninth query starting to escalate is a
-# regression, and it would be invisible if this test had simply been relaxed.
-KNOWN_LOST_DEFLECTIONS = {"i need to send this back, it arrived broken"}
+# Keep the set, empty, rather than deleting the mechanism. A genuine query starting to
+# escalate is a regression, and one that arrives silently is one nobody fixes.
+KNOWN_LOST_DEFLECTIONS: set[str] = set()
 
 THRESHOLD = 0.35
 

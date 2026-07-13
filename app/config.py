@@ -42,20 +42,20 @@ class Settings(BaseSettings):
     # still land a high embedding similarity, which is the exact failure this
     # gate exists to catch.
     #
-    # 0.5, set by the Phase 11 eval over 320 real Bitext queries. It is the only
-    # point in the sweep that keeps false answers under the PRD's 2% cap (1.9%,
-    # 0 of 100 negatives leaked), and it costs deflection to do it: 25.0%, against
-    # a 40% target. Both numbers are in docs/benchmark.md.
+    # 0.2, set by the Phase 11 eval over 320 real Bitext queries (docs/benchmark.md).
+    # It hits both PRD targets with margin on each: 42.3% deflection against a 40%
+    # target, 1.3% false answers against a 2% cap.
     #
-    # This reverses Phase 3, which measured 0.35 on 17 hand-written queries and
-    # rejected 0.5 as too strict. Phase 3 was not wrong about its 17 queries; it
-    # was wrong to believe 17 queries. Real Bitext phrasing ("correct order",
-    # "i cant afford order") scores far lower on the cross-encoder than anything
-    # written by someone who already knew what the KB said.
+    # Not the 0.1 that maximises deflection (45.9%). That sits at 1.9% false answers
+    # against a 2.0% cap, which is not a margin, it is a coincidence - the next KB
+    # edit would eat it. The cap is a promise to a customer and it is worth 3.6
+    # points of deflection to keep room under it.
     #
-    # Deflection is bought back by fixing retrieval, not by lowering this. See
-    # tasks/todo.md, Phase 11.
-    confidence_threshold: float = 0.5
+    # Both this and the 0.5 it replaced are only reachable because the KB gaps the
+    # eval found got fixed first. At the original corpus, no threshold hit both
+    # targets at once: it was 25% deflection at 1.9%, or 43% deflection at 5%. The
+    # lesson is that the threshold was never the lever. Retrieval was.
+    confidence_threshold: float = 0.2
 
     conversation_ttl_seconds: int = 3600
 
