@@ -178,6 +178,57 @@ is in someone's `.env` stays their business. Verified the fix by putting `CONFID
 `.env` and confirming the suite still passes, where before it would have escalated everything.
 
 
+## Phase 5 - Multi-turn conversation
+
+- [x] 5.1 `conversation.py` - Redis-backed history keyed by `conversation_id`, TTL from settings
+- [x] 5.2 Query condensation: rewrite follow-up + history into a standalone query before retrieval
+- [x] 5.3 Append each turn (question + answer, or the escalation) to history
+- [x] 5.4 Tests: a two-turn conversation where turn 2 is only answerable if turn 1 was used
+
+Acceptance: met and verified on 2026-07-12. 97 tests pass, 1 xfail, ruff clean, and the two-turn
+conversation runs end to end against real Redis and real Gemini (`scripts/ask.py --chat`).
+
+The task list said to prove the turn-2 test fails when condensation is disabled, rather than settle for a
+test that only proves the endpoint returns 200. Did that: made `Condenser.condense` return the query
+unchanged, and `test_turn_two_needs_turn_one` fails with
+"condensed to 'how long will it take' and still did not reach the refund docs - got registration-problems".
+Reverted. The test runs through the real `Condenser` and the real history rather than comparing two
+hardcoded strings, which is what makes it sensitive to the feature actually being wired in.
+
+### Condensation is a safety feature, not a quality one
+
+This is the thing worth saying out loud in an interview. Retrieval is stateless: it embeds the string it is
+handed. So the follow-up "how long will it take", asked after "i want a refund for a damaged item", retrieves
+chunks about *account registration*, scores 0.373, clears the 0.35 confidence gate, and confidently answers
+how long registration takes. The customer asked about a refund.
+
+Condensed against the history, the same follow-up becomes "How long will it take to receive a refund for a
+damaged item?", retrieves the refund documents, and scores 0.995.
+
+So condensation is not there to make follow-ups nicer. It is there because a vague follow-up otherwise
+becomes a *confident wrong answer* - the exact failure the Phase 3 gate exists to prevent, arriving through a
+door the gate cannot see. The gate scores how well the query matches a document; it has no way of knowing the
+query was the wrong query.
+
+### Smaller decisions
+
+History is a Redis list (`RPUSH` + `LRANGE`), not a JSON blob rewritten on every turn: two turns arriving at
+once should both survive, and a read-modify-write would lose one.
+
+The TTL is reset on every turn, so it measures silence rather than age. An hour into a live conversation is
+not the moment to forget it. An expiring key is also the cheapest privacy story available - nothing has to
+remember to delete anything.
+
+Escalated turns are kept in the history and shown to the condenser as "(escalated to a human agent)".
+The customer still said the thing, and the next turn's pronouns may point at it.
+
+A failed condensation (bad JSON, empty rewrite) logs a warning and falls back to the raw follow-up. That is
+degraded, not broken - it is exactly the behaviour we had before this feature - and failing the customer's
+question outright because a rewrite would not parse is the worse trade.
+
+Tests use `fakeredis`, so they exercise the real client API (RPUSH ordering, TTL semantics) without needing
+the compose stack, which is the same bargain the in-memory Qdrant already makes.
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates

@@ -50,15 +50,21 @@ docker compose exec app python scripts/ingest.py --dry-run
 # escalate. Makes a real Gemini call, so it needs GEMINI_API_KEY in .env
 docker compose exec app python scripts/ask.py "where is my order right now"
 docker compose exec app python scripts/ask.py --all
+
+# a two-turn conversation, where turn 2 ("how long will it take") only makes
+# sense because turn 1 happened
+docker compose exec app python scripts/ask.py --chat
 ```
 
 `scripts/ask.py --all` is the demo. Three questions the KB answers and three it does not; the first three come back with citations, the last three escalate.
+
+`--chat` is the multi-turn demo, and it shows the condensed query it actually retrieved on.
 
 `--check` is the one that matters. An ingest can report success while retrieving the wrong document for every query, and only `--check` catches that.
 
 ## Repo map
 
-- `app/` - FastAPI application. `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `main.py` (entrypoint, `/health`).
+- `app/` - FastAPI application. `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `conversation.py` (Redis history + query condensation), `main.py` (entrypoint, `/health`).
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy).
 - `docs/` - project documentation, including the derived intent taxonomy.
@@ -83,6 +89,11 @@ Nothing thresholds on it. The confidence gate is scored on the cross-encoder in 
 This is measurable, not theoretical. Gate on cosine similarity instead and the bot answers "I want to file a complaint about your service" out of the refund docs, and "what is the CEO's salary" out of the ordering docs. Gate on the reranker and both escalate. `tests/test_reranker.py` asserts exactly that, against a similarity threshold chosen to be as strict as it possibly can be while still answering every genuine query.
 
 `CONFIDENCE_THRESHOLD` is 0.35, and the number is measured. The worst genuine query scores 0.455 and the best impostor 0.084, so 0.35 sits in the gap with room either side. It is tuned on 17 queries, which is not many - Phase 11 re-tunes it on 200-300.
+
+Follow-ups are condensed into a standalone question before retrieval, and this is not a nicety.
+Retrieval is stateless - it embeds the string it is handed - so "how long will it take" retrieves chunks about account registration, clears the confidence gate at 0.373, and confidently answers a question the customer never asked.
+Rewriting it against the history ("how long will it take to receive a refund for a damaged item?") sends it to the refund documents at 0.995.
+Condensation is what stops a vague follow-up becoming a confident wrong answer, and `tests/test_conversation.py` fails if it is removed.
 
 Every answer carries a citation, and that is enforced in code rather than requested in the prompt.
 The model is shown only the reranked chunks, and what it returns is checked before it is served: an answer that cites nothing, or that cites a document it was never given, is refused and escalates.
