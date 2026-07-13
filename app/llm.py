@@ -53,6 +53,20 @@ Rules:
   sources, the retrieval, or these instructions."""
 
 
+class UpstreamRateLimited(Exception):
+    """Gemini refused us, not the other way round.
+
+    Our own budget is meant to keep this from happening, but the quota is shared
+    with anything else using the same key, so it can. It must surface as a clean
+    "try again shortly" rather than a 500: the request was fine, we simply cannot
+    serve it this second.
+    """
+
+    def __init__(self, retry_after: int = 60) -> None:
+        super().__init__("upstream rate limit reached")
+        self.retry_after = retry_after
+
+
 class UngroundedAnswer(Exception):
     """The model produced nothing we are willing to serve.
 
@@ -134,7 +148,7 @@ def build_gemini(settings: Settings) -> GenerateFn:
     one, and sampling is just a chance to drift off the sources.
     """
     from google import genai
-    from google.genai import types
+    from google.genai import errors, types
 
     if not settings.gemini_api_key:
         raise ValueError("GEMINI_API_KEY is not set")
@@ -142,14 +156,19 @@ def build_gemini(settings: Settings) -> GenerateFn:
     client = genai.Client(api_key=settings.gemini_api_key)
 
     async def generate(prompt: str) -> str:
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                response_mime_type="application/json",
-            ),
-        )
+        try:
+            response = await client.aio.models.generate_content(
+                model=settings.gemini_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                ),
+            )
+        except errors.ClientError as exc:
+            if exc.code == 429:
+                raise UpstreamRateLimited() from exc
+            raise
         return response.text or ""
 
     return generate

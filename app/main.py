@@ -9,7 +9,14 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient
 
+from app.api import router
+from app.bot import SupportBot
 from app.config import get_settings
+from app.conversation import Condenser, ConversationStore
+from app.llm import AnswerGenerator, build_gemini
+from app.ratelimit import RateLimiter, TurnLimiter
+from app.reranker import Reranker, build_cross_encoder
+from app.retrieval import Retriever, build_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,27 @@ async def lifespan(app: FastAPI):
 
     app.state.qdrant = AsyncQdrantClient(url=settings.qdrant_url)
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+
+    # The models load once, here, and not on the first request. Both are hundreds
+    # of MB and take seconds to warm; doing it lazily would hand that latency to
+    # whichever customer happened to arrive first.
+    generate = build_gemini(settings)
+    app.state.bot = SupportBot(
+        retriever=Retriever(
+            app.state.qdrant,
+            build_encoder(settings),
+            settings.qdrant_collection,
+            settings.retrieval_top_n,
+        ),
+        reranker=Reranker(
+            build_cross_encoder(settings), settings.rerank_top_k, settings.confidence_threshold
+        ),
+        generator=AnswerGenerator(generate),
+        condenser=Condenser(generate),
+        store=ConversationStore(app.state.redis, settings.conversation_ttl_seconds),
+    )
+    app.state.limiter = build_limiter(app.state.redis, settings)
+
     try:
         yield
     finally:
@@ -28,7 +56,23 @@ async def lifespan(app: FastAPI):
         await app.state.redis.aclose()
 
 
+def build_limiter(redis, settings) -> TurnLimiter:
+    return TurnLimiter(
+        per_minute=RateLimiter(
+            redis, settings.rate_limit_per_minute, window_seconds=60, namespace="client-minute"
+        ),
+        per_day=RateLimiter(
+            redis, settings.rate_limit_per_day, window_seconds=86_400, namespace="client-day"
+        ),
+        # Sized in turns, not requests: one turn can cost two Gemini calls.
+        upstream=RateLimiter(
+            redis, settings.upstream_turns_per_minute, window_seconds=60, namespace="upstream-minute"
+        ),
+    )
+
+
 app = FastAPI(title="Support Bot", version="0.1.0", lifespan=lifespan)
+app.include_router(router)
 
 
 async def _check_qdrant(app: FastAPI) -> tuple[bool, str]:
