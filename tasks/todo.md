@@ -380,6 +380,51 @@ Both invisible to the test suite, both found by actually reading the container's
 - **sentence-transformers printed a tqdm progress bar on every single query.** `show_progress_bar=False` was set
   in ingestion but not in the query encoder, so every retrieval dumped `Batches: 100%|...` into the logs.
 
+## Phases 9 & 10 - Test suite and CI/CD (Codex CLI)
+
+- [x] 9.1 Gap-filling tests in `tests/test_retrieval.py` and `tests/test_api.py`
+- [x] 9.2 Coverage check - flagged every endpoint and branch with no test
+- [x] 10.1 GitHub Actions: ruff -> pytest -> build image -> push to GHCR on `main` only
+- [x] 10.2 Lint and test failures fail the build
+
+Handed to Codex CLI per the task list's tool division, scoped by `tasks/codex-handoff.md` (that section only,
+not the whole project). It was told explicitly: do not touch `app/`, and if you find a bug, write it down
+instead of fixing it.
+
+It did exactly that, and the write-down was worth more than the tests.
+
+### The bug Codex found
+
+**The escalation response dropped the customer's original wording.** It carried `condensed_query` - the rewrite
+we searched on - and not `query`, the words they actually typed. Phase 6.1 requires the original query in the
+handoff payload, and I had missed it.
+
+It matters more than a missing field: condensation is a retrieval device and it can be wrong. Handing an agent
+only the rewrite hides the mistake most likely to have *caused* the escalation - the customer said one thing
+and we searched for another. Fixed in `app/api.py`, with the test that should have existed.
+
+### The bug its coverage pass implied
+
+Codex flagged `GET /health` as having no test. Writing one showed why: `health()` read the **module-level `app`
+global** instead of the request's app, so it could not be exercised against a test app at all. An endpoint that
+is awkward to test is usually telling you something, and here it was tying "is the app healthy" to one
+particular app object. Now takes `Request`. Compose gates container readiness on this endpoint, so it is not a
+cosmetic fix.
+
+Also covered from its flags: `client_identity()`'s no-peer fallback, and the assertion that `X-Forwarded-For`
+cannot change who a caller is (it is caller-controlled - honouring it is a rate limiter that does not limit).
+
+160 tests pass, 1 xfail, ruff clean. `/health` verified against the running container: 200, and compose
+reports `healthy`.
+
+### On the CI workflow
+
+Reviewed rather than trusted. It blocks on lint and test (10.2), caches HuggingFace weights keyed on
+`app/config.py`, builds on every PR but only pushes to GHCR on `main`, pins actions to major tags, and needs no
+`GEMINI_API_KEY` - the suite mocks the LLM, so a CI run that needed a real key would itself be the bug.
+
+Not verifiable locally: the GHCR push, which needs a real `main` run. First merge to `main` will prove it.
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates

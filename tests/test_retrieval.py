@@ -16,6 +16,7 @@ Both use an in-memory Qdrant, so neither needs the compose stack running.
 import pytest
 from qdrant_client import AsyncQdrantClient, models
 
+from app.config import Settings
 from app.retrieval import Candidate, Retriever
 from tests.conftest import COLLECTION, IN_SCOPE_QUERIES
 
@@ -145,6 +146,14 @@ async def test_search_limit_overrides_top_n(populated):
 
 
 @pytest.mark.asyncio
+async def test_search_strips_whitespace_before_encoding(populated):
+    """The same question should not become a different embedding by accident."""
+    hits = await make_retriever(populated).search("  where is my order  ")
+
+    assert hits[0].doc_id == "tracking-your-order"
+
+
+@pytest.mark.asyncio
 async def test_search_returns_everything_it_has_when_short(populated):
     """Fewer chunks than top_n is not an error - the reranker just gets less."""
     hits = await make_retriever(populated, top_n=10).search("where is my order")
@@ -176,6 +185,49 @@ async def test_empty_collection_returns_no_candidates(client):
 async def test_empty_query_is_rejected(populated, query):
     with pytest.raises(ValueError, match="empty query"):
         await make_retriever(populated).search(query)
+
+
+def test_candidate_defaults_missing_intents_to_an_empty_tuple_and_formats_a_passage():
+    """Old points without an intent payload remain readable by the reranker."""
+
+    class Point:
+        payload = {**FIXTURE_POINTS[0]["payload"]}
+        payload.pop("intents")
+        score = 0.75
+
+    candidate = Candidate.from_point(Point())
+
+    assert candidate.intents == ()
+    assert candidate.passage == (
+        "Tracking your order > Where to find your tracking link\n\n"
+        "Your tracking link appears in the shipping confirmation email."
+    )
+
+
+def test_build_encoder_uses_the_configured_model_and_normalized_embeddings(monkeypatch):
+    """Query encoding must stay compatible with the vectors ingestion created."""
+    calls = []
+
+    class Vector:
+        def tolist(self):
+            return [0.25, 0.75]
+
+    class Model:
+        def encode(self, query, **kwargs):
+            calls.append((query, kwargs))
+            return Vector()
+
+    model = Model()
+    monkeypatch.setattr("app.ingestion.load_embedder", lambda settings: model)
+
+    from app.retrieval import build_encoder
+
+    encoder = build_encoder(Settings(_env_file=None, embedding_model="test-model"))
+
+    assert encoder("a query") == [0.25, 0.75]
+    assert calls == [
+        ("a query", {"normalize_embeddings": True, "show_progress_bar": False})
+    ]
 
 
 # --- the acceptance criterion ----------------------------------------------

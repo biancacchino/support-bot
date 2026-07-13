@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient
 
@@ -118,15 +118,20 @@ async def _check_redis(app: FastAPI) -> tuple[bool, str]:
 
 
 @app.get("/health")
-async def health() -> JSONResponse:
+async def health(request: Request) -> JSONResponse:
     """Liveness plus dependency reachability.
 
     Reports 503 when a dependency is unreachable so that `docker-compose up`
     failing to network the containers together surfaces here rather than at
     the first real query.
+
+    Takes the app off the request rather than closing over the module-level
+    `app`. Reading the global made this handler untestable - which is exactly why
+    Codex's Phase 9 pass found it had no test - and quietly tied "is the app
+    healthy" to one particular app object.
     """
-    qdrant_ok, qdrant_detail = await _check_qdrant(app)
-    redis_ok, redis_detail = await _check_redis(app)
+    qdrant_ok, qdrant_detail = await _check_qdrant(request.app)
+    redis_ok, redis_detail = await _check_redis(request.app)
 
     healthy = qdrant_ok and redis_ok
     body: dict[str, Any] = {

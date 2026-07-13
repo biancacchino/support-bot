@@ -5,6 +5,8 @@ the shape a client has to branch on, and whether a limit produces a usable answe
 rather than a stack trace - not the pipeline, which has its own suite.
 """
 
+from dataclasses import replace
+
 import pytest
 from fakeredis.aioredis import FakeRedis
 from fastapi import FastAPI
@@ -89,10 +91,10 @@ async def redis():
     await client.aclose()
 
 
-async def call(app, **body):
+async def call(app, headers: dict | None = None, **body):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        return await client.post("/chat", json=body)
+        return await client.post("/chat", json=body, headers=headers)
 
 
 # --- the two shapes ---------------------------------------------------------
@@ -108,6 +110,8 @@ async def test_an_answered_turn_comes_back_answered_and_cited(redis):
     assert body["answer"] == "Refunds take five working days."
     assert body["citations"] == ["refund-policy"]
     assert body["conversation_id"]  # minted for us
+    assert body["confidence"] == 0.91
+    assert body["condensed_query"] == "how long does a refund take"
 
 
 @pytest.mark.asyncio
@@ -120,6 +124,8 @@ async def test_an_escalated_turn_is_a_different_shape_entirely(redis):
     assert body["reason"] == "low_confidence"
     assert "answer" not in body
     assert "citations" not in body
+    assert body["confidence"] == 0.02
+    assert body["condensed_query"] == "what is your ceo paid"
 
 
 @pytest.mark.asyncio
@@ -130,6 +136,27 @@ async def test_an_escalation_hands_over_the_evidence(redis):
     body = response.json()
     assert body["retrieved"] == [{"doc_id": "placing-an-order", "title": "Placing an order", "score": 0.02}]
     assert [t["question"] for t in body["history"]] == ["hello"]
+
+
+@pytest.mark.asyncio
+async def test_an_escalation_hands_over_what_the_customer_actually_typed(redis):
+    """Phase 6.1 wants the original query, and the rewrite is not a substitute.
+
+    Condensation is a retrieval device and it can be wrong. Handing an agent only
+    the rewrite would hide the mistake most likely to have caused the escalation -
+    the customer said one thing and we searched for another. Found by Codex during
+    Phase 9: the response carried `condensed_query` and dropped the original.
+    """
+    escalated = replace(
+        ESCALATED,
+        query="how long will it take",
+        condensed_query="how long does a refund for a damaged item take",
+    )
+
+    body = (await call(build_app(StubBot(escalated), generous(redis)), message="q")).json()
+
+    assert body["query"] == "how long will it take"
+    assert body["condensed_query"] == "how long does a refund for a damaged item take"
 
 
 @pytest.mark.asyncio
@@ -188,6 +215,21 @@ async def test_a_rate_limited_turn_never_reaches_the_bot(redis):
 
 
 @pytest.mark.asyncio
+async def test_api_keys_are_limited_independently(redis):
+    """A caller cannot consume another API-key holder's per-caller allowance."""
+    stingy = TurnLimiter(
+        per_minute=RateLimiter(redis, 1, 60, "client-minute"),
+        per_day=RateLimiter(redis, 100, 86_400, "client-day"),
+        upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+    )
+    app = build_app(StubBot(), stingy)
+
+    assert (await call(app, headers={"x-api-key": "first"}, message="one")).status_code == 200
+    assert (await call(app, headers={"x-api-key": "second"}, message="two")).status_code == 200
+    assert (await call(app, headers={"x-api-key": "first"}, message="three")).status_code == 429
+
+
+@pytest.mark.asyncio
 async def test_gemini_refusing_us_is_a_429_and_not_a_500(redis):
     """Their request was fine. We simply cannot serve it this second."""
     bot = StubBot(raises=UpstreamRateLimited(retry_after=30))
@@ -197,6 +239,18 @@ async def test_gemini_refusing_us_is_a_429_and_not_a_500(redis):
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "30"
     assert "limit" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_an_upstream_refusal_is_not_recorded_as_a_completed_turn(redis):
+    metrics = MetricsStore(redis)
+    response = await call(
+        build_app(StubBot(raises=UpstreamRateLimited(retry_after=30)), generous(redis), metrics),
+        message="how long for a refund",
+    )
+
+    assert response.status_code == 429
+    assert (await metrics.snapshot())["turns"] == 0
 
 
 # --- what the turn leaves behind --------------------------------------------
@@ -232,6 +286,21 @@ async def test_an_escalated_turn_is_counted_with_its_reason_and_category(redis):
     assert snapshot["escalation_rate"] == 1.0
     assert snapshot["escalation_reasons"] == {"low_confidence": 1}
     assert snapshot["by_category"]["ORDER"]["escalated"] == 1
+
+
+@pytest.mark.asyncio
+async def test_an_escalation_without_chunks_is_returned_and_counted(redis):
+    """A retrieval miss still produces a handoff, just without a category."""
+    metrics = MetricsStore(redis)
+    no_chunks = replace(ESCALATED, chunks=[])
+
+    response = await call(build_app(StubBot(no_chunks), generous(redis), metrics), message="q")
+
+    assert response.status_code == 200
+    assert response.json()["retrieved"] == []
+    snapshot = await metrics.snapshot()
+    assert snapshot["escalation_reasons"] == {"low_confidence": 1}
+    assert snapshot["by_category"] == {}
 
 
 @pytest.mark.asyncio

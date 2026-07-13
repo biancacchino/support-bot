@@ -57,6 +57,11 @@ class ChatResponse(BaseModel):
 
     # escalated only: what a human agent needs to pick this up cold
     reason: str | None = None
+    # The customer's own words, not the rewrite we searched on. An agent needs to
+    # read what was actually typed: condensation is a retrieval device and it can
+    # be wrong, so handing over only its output would hide the very mistake most
+    # likely to have caused the escalation.
+    query: str | None = None
     history: list[dict] | None = None
     retrieved: list[Source] | None = None
 
@@ -227,6 +232,7 @@ def _escalation_body(result: Escalated, conversation_id: str) -> ChatResponse:
         confidence=result.confidence,
         condensed_query=result.condensed_query,
         reason=str(result.reason),
+        query=result.query,
         history=[
             {
                 "question": turn.question,
