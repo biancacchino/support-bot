@@ -24,7 +24,11 @@ pyyaml>=6.0,<7.0
 google-genai>=1.0,<2.0
 
 # Test + lint
+# fakeredis keeps the conversation tests hermetic: they exercise the real redis
+# client API (RPUSH/LRANGE/EXPIRE, TTL semantics) without needing the compose
+# stack up, which is the same bargain the in-memory Qdrant makes elsewhere.
 pytest>=8.0,<9.0
 pytest-asyncio>=0.23,<1.0
+fakeredis>=2.23,<3.0
 httpx>=0.27,<1.0
 ruff>=0.5,<1.0
