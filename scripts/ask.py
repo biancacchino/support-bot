@@ -14,7 +14,6 @@ import argparse
 import asyncio
 import sys
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -22,9 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import redis.asyncio as aioredis  # noqa: E402
 from qdrant_client import AsyncQdrantClient  # noqa: E402
 
+from app.bot import Answered, SupportBot  # noqa: E402
 from app.config import get_settings  # noqa: E402
-from app.conversation import Condenser, ConversationStore, Turn  # noqa: E402
-from app.llm import AnswerGenerator, UngroundedAnswer, build_gemini  # noqa: E402
+from app.conversation import Condenser, ConversationStore  # noqa: E402
+from app.llm import AnswerGenerator, build_gemini  # noqa: E402
 from app.reranker import Reranker, build_cross_encoder  # noqa: E402
 from app.retrieval import Retriever, build_encoder  # noqa: E402
 
@@ -45,59 +45,41 @@ CHAT_TURNS = [
     "how long will it take",
 ]
 
+# Turn 1 escalates. Turn 2 is a question the bot answers happily on its own - and
+# does not answer here, because a human owns this conversation now.
+STICKY_TURNS = [
+    "i want to file a complaint about your service",
+    "where is my order right now",
+]
 
-async def ask(pipeline, query: str, conversation_id: str | None = None) -> None:
-    """One turn, end to end. With a conversation_id, history is used and updated."""
+
+async def ask(bot: SupportBot, query: str, conversation_id: str) -> None:
+    """One turn, printed the way an operator would want to read it."""
     print(f"\n{'=' * 78}\nQ  {query}")
 
-    history = await pipeline.store.history(conversation_id) if conversation_id else []
-    retrieval_query = await pipeline.condenser.condense(query, history)
+    result = await bot.handle(query, conversation_id)
 
-    if retrieval_query != query:
-        print(f"   (condensed to: {retrieval_query!r})")
+    if result.condensed_query != query:
+        print(f"   (condensed to: {result.condensed_query!r})")
 
-    candidates = await pipeline.retriever.search(retrieval_query)
-    result = await pipeline.reranker.rerank(retrieval_query, candidates)
+    if isinstance(result, Answered):
+        print(f"-> ANSWERED   confidence {result.confidence:.3f}")
+        print(f"\n   {result.text}")
+        print(f"\n   sources: {', '.join(result.citations)}")
+        return
 
-    turn = None
-    if result.escalate:
-        top = result.top.doc_id if result.top else "nothing"
-        print(
-            f"-> ESCALATED  confidence {result.confidence:.3f} < "
-            f"{pipeline.threshold} (best guess was {top})"
-        )
-        turn = Turn(question=query, answer="", escalated=True)
-    else:
-        try:
-            answer = await pipeline.generator.answer(retrieval_query, result.ranked)
-        except UngroundedAnswer as exc:
-            # The gate was confident and the model still would not ground an
-            # answer. Escalating rather than serving something uncited is the point.
-            print(f"-> ESCALATED  confidence {result.confidence:.3f}, but ungrounded: {exc}")
-            turn = Turn(question=query, answer="", escalated=True)
-        else:
-            print(f"-> ANSWERED   confidence {result.confidence:.3f}")
-            print(f"\n   {answer.text}")
-            print(f"\n   sources: {', '.join(answer.citations)}")
-            turn = Turn(
-                question=query,
-                answer=answer.text,
-                escalated=False,
-                citations=answer.citations,
-            )
-
-    if conversation_id:
-        await pipeline.store.append(conversation_id, turn)
-
-
-@dataclass
-class Pipeline:
-    retriever: Retriever
-    reranker: Reranker
-    generator: AnswerGenerator
-    condenser: Condenser
-    store: ConversationStore
-    threshold: float
+    # The handoff payload, which is the whole point of an escalation: everything
+    # an agent needs to pick this up without re-asking the customer anything.
+    print(f"-> ESCALATED  {result.reason}  confidence {result.confidence:.3f}")
+    if result.history:
+        print(f"\n   conversation so far ({len(result.history)} turn(s)):")
+        for turn in result.history:
+            said = turn.answer if not turn.escalated else "(escalated)"
+            print(f"     customer: {turn.question}")
+            print(f"     bot:      {said[:70]}")
+    print("\n   what the bot found, and how sure it was (below the gate, or it would have answered):")
+    for chunk in result.chunks:
+        print(f"     {chunk.score:.3f}  {chunk.doc_id}")
 
 
 async def main() -> int:
@@ -105,17 +87,20 @@ async def main() -> int:
     parser.add_argument("query", nargs="?", help="the customer's question")
     parser.add_argument("--all", action="store_true", help="run the demo set")
     parser.add_argument("--chat", action="store_true", help="run the two-turn conversation")
+    parser.add_argument(
+        "--sticky", action="store_true", help="show that an escalated conversation stays escalated"
+    )
     args = parser.parse_args()
 
-    if not args.query and not args.all and not args.chat:
-        parser.error("give a query, or --all, or --chat")
+    if not any((args.query, args.all, args.chat, args.sticky)):
+        parser.error("give a query, or --all, or --chat, or --sticky")
 
     settings = get_settings()
     qdrant = AsyncQdrantClient(url=settings.qdrant_url)
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     generate = build_gemini(settings)
 
-    pipeline = Pipeline(
+    bot = SupportBot(
         retriever=Retriever(
             qdrant, build_encoder(settings), settings.qdrant_collection, settings.retrieval_top_n
         ),
@@ -125,19 +110,22 @@ async def main() -> int:
         generator=AnswerGenerator(generate),
         condenser=Condenser(generate),
         store=ConversationStore(redis, settings.conversation_ttl_seconds),
-        threshold=settings.confidence_threshold,
     )
 
     try:
-        if args.chat:
+        if args.chat or args.sticky:
             # A fresh id each run, so the demo never reads a previous run's history.
             conversation_id = f"demo-{uuid.uuid4().hex[:8]}"
             print(f"conversation {conversation_id}")
-            for query in CHAT_TURNS:
-                await ask(pipeline, query, conversation_id=conversation_id)
+            for query in CHAT_TURNS if args.chat else STICKY_TURNS:
+                await ask(bot, query, conversation_id)
         else:
+            # One-shot questions are still conversations, just very short ones. A
+            # fresh id each time keeps them from inheriting each other's history -
+            # and, now that escalation is sticky, from inheriting each other's
+            # escalations.
             for query in DEMO_QUERIES if args.all else [args.query]:
-                await ask(pipeline, query)
+                await ask(bot, query, f"demo-{uuid.uuid4().hex[:8]}")
     finally:
         await qdrant.close()
         await redis.aclose()

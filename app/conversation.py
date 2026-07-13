@@ -94,6 +94,10 @@ class ConversationStore:
     def _key(conversation_id: str) -> str:
         return f"conversation:{conversation_id}"
 
+    @staticmethod
+    def _escalated_key(conversation_id: str) -> str:
+        return f"conversation:{conversation_id}:escalated"
+
     async def append(self, conversation_id: str, turn: Turn) -> None:
         """Add a turn and push the expiry out.
 
@@ -113,6 +117,25 @@ class ConversationStore:
         """The last `limit` turns, oldest first. Unknown conversation: no turns."""
         raw = await self._redis.lrange(self._key(conversation_id), -limit, -1)
         return [Turn.from_json(item) for item in raw]
+
+    async def mark_escalated(self, conversation_id: str) -> None:
+        """Hand the conversation to a human, permanently.
+
+        Escalation is sticky: from here on the bot does not answer in this
+        conversation, even a turn it would be confident about. See app/bot.py for
+        why, and for what that costs.
+
+        Shares the history's TTL, so the flag cannot outlive the turns it refers
+        to and leave a conversation escalated with nothing to hand over.
+        """
+        key = self._escalated_key(conversation_id)
+        pipe = self._redis.pipeline()
+        pipe.set(key, "1")
+        pipe.expire(key, self._ttl)
+        await pipe.execute()
+
+    async def is_escalated(self, conversation_id: str) -> bool:
+        return await self._redis.exists(self._escalated_key(conversation_id)) == 1
 
 
 def format_history(turns: list[Turn]) -> str:
