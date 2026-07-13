@@ -21,6 +21,12 @@ COPY app ./app
 COPY kb ./kb
 COPY scripts ./scripts
 
+# The suite needs it: without pytest.ini, pytest falls back to asyncio_mode=strict,
+# every async fixture is handed to a test as an un-awaited coroutine, and 85 tests
+# fail on it. Mounting the whole repo would also bring it in, but it brings .env
+# too, and a local .env silently deciding what the tests conclude has bitten once.
+COPY pytest.ini .
+
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /models \
     && chown -R appuser:appuser /models /srv
