@@ -53,7 +53,19 @@ OFF_TOPIC_QUERIES = [
 
 @pytest.fixture(scope="session")
 def settings() -> Settings:
-    return Settings(kb_dir=str(KB_DIR))
+    """Settings from the code defaults, with the developer's .env shut out.
+
+    `_env_file=None` is load-bearing. pydantic-settings lets an .env override a
+    code default, which is right for the app and wrong for the suite: it means a
+    stale value in an untracked local file changes what the tests conclude. It
+    already did. A .env still pinning the old CONFIDENCE_THRESHOLD=0.5 made the
+    gate escalate a genuine query and failed a Phase 3 test that had nothing to
+    do with the change being made.
+
+    Tests assert against the defaults the repo ships. Whatever is in someone's
+    .env is their business and not the suite's.
+    """
+    return Settings(_env_file=None, kb_dir=str(KB_DIR))
 
 
 @pytest.fixture(scope="session")

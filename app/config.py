@@ -14,7 +14,17 @@ class Settings(BaseSettings):
     )
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-lite"
+
+    # The task list asked for gemini-2.5-flash-lite. Google has since closed that
+    # model to new API keys - it still appears in models.list(), but calling it
+    # returns 404 "no longer available to new users", so the spec's choice is not
+    # buildable as written. gemini-3.1-flash-lite is the current model at the same
+    # tier and works on this key.
+    #
+    # Pinned to an explicit version rather than the gemini-flash-lite-latest
+    # alias: the alias moves under you, and Phase 11's benchmark numbers are only
+    # worth showing if the model that produced them can be named.
+    gemini_model: str = "gemini-3.1-flash-lite"
 
     qdrant_url: str = "http://qdrant:6333"
     qdrant_collection: str = "support_kb"

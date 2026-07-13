@@ -134,6 +134,50 @@ at 0.75 confidence out of the payments doc, and ignores the fraud. It should esc
 Phase 12 asks specifically about adversarial input, and a quietly dropped test case is how that question
 gets answered wrongly.
 
+## Phase 4 - Answer generation & citations
+
+- [x] 4.1 `llm.py` - Gemini wrapper
+- [x] 4.2 Prompt that forces grounding in the retrieved chunks only, no un-cited claims
+- [x] 4.3 Response schema carries source citation(s) on every answer
+- [x] 4.4 Mocked-LLM tests, so CI never spends Gemini quota
+
+Acceptance: met and verified on 2026-07-12. 81 tests pass, 1 xfail, ruff clean, and the pipeline runs
+end to end against real Gemini (`scripts/ask.py --all`): 3 answerable questions come back with citations,
+3 unanswerable ones escalate.
+
+Citations are enforced in code, not asked for in the prompt. The model only ever sees the reranked chunks,
+and what it returns is validated before it is served: an answer that cites nothing, or that cites a document
+it was never given, raises `UngroundedAnswer` and escalates. A fabricated citation is the worst failure this
+system can produce, because the citation is the part a customer trusts - it turns a guess into something that
+looks sourced. `test_every_served_answer_cites_a_real_source` asserts the invariant over every shape of reply
+(valid, uncited, fabricated-source, refusal, non-JSON): either it raises, or it returns an answer whose
+citations are non-empty and drawn from the sources actually supplied. There is no third outcome.
+
+### The spec's model no longer exists
+
+`gemini-2.5-flash-lite` is closed to new API keys. It still appears in `models.list()`, which is what makes
+this confusing, but calling it returns 404 "no longer available to new users", so the spec's choice is not
+buildable as written. Now on `gemini-3.1-flash-lite`, the current model at the same tier, verified working
+against Bianca's key. Pinned to an explicit version rather than the `gemini-flash-lite-latest` alias: the
+alias moves under you, and a benchmark number in Phase 11 is only worth showing if the model that produced
+it can be named.
+
+### A stale .env silently broke the confidence gate
+
+Found because mounting the whole repo into the test container exposed `.env` for the first time, and a
+Phase 3 test failed on a change that had nothing to do with Phase 3.
+
+`.env` still pinned `CONFIDENCE_THRESHOLD=0.5` from before Phase 3 measured it at 0.35. The env file wins
+over the code default, correctly, so the *running app* was gating at 0.5 and escalating 2 of the 8 genuine
+queries - the exact 25% deflection loss Phase 3 thought it had fixed. The measured value now lives in
+`config.py` alone, and it is commented out of `.env.example` so it cannot go stale in two places again.
+
+Worse than the stale value: the test suite's verdict depended on an untracked local file. `tests/conftest.py`
+now builds `Settings(_env_file=None)`, so the suite asserts against the defaults the repo ships and whatever
+is in someone's `.env` stays their business. Verified the fix by putting `CONFIDENCE_THRESHOLD=0.99` in
+`.env` and confirming the suite still passes, where before it would have escalated everything.
+
+
 ## Fixed along the way
 
 - `chunk_size_tokens` was 400, but `all-MiniLM-L6-v2` reads at most 256 tokens and silently truncates
@@ -151,5 +195,7 @@ gets answered wrongly.
 
 - `google-generativeai` is deprecated (Google ended support in 2025) in favour of the `google-genai` SDK.
   Using `google-genai` instead, since a new project should not start on a dead SDK.
-  Both reach `gemini-2.5-flash-lite`, so nothing downstream changes.
+- The model is `gemini-3.1-flash-lite`, not the `gemini-2.5-flash-lite` the task list named.
+  That model is closed to new API keys and returns 404 on every call, so the spec is not buildable as
+  written. Same tier, current, and pinned to an explicit version rather than a `-latest` alias.
 - Knowledge base corpus lives in `kb/`, not `docs/`, so it does not collide with project documentation.
