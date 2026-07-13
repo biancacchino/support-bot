@@ -5,15 +5,19 @@ the shape a client has to branch on, and whether a limit produces a usable answe
 rather than a stack trace - not the pipeline, which has its own suite.
 """
 
+from dataclasses import replace
+
 import pytest
 from fakeredis.aioredis import FakeRedis
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.api import get_bot, get_limiter, router
+from app.api import get_bot, get_limiter, get_metrics, router
 from app.bot import Answered, Escalated, EscalationReason
+from app.config import get_settings
 from app.conversation import Turn
 from app.llm import UpstreamRateLimited
+from app.observability import MetricsStore
 from app.ratelimit import RateLimiter, TurnLimiter
 from app.reranker import Ranked
 from app.retrieval import Candidate
@@ -23,6 +27,7 @@ ANSWERED = Answered(
     citations=("refund-policy",),
     confidence=0.91,
     condensed_query="how long does a refund take",
+    category="REFUND",
 )
 
 ESCALATED = Escalated(
@@ -62,11 +67,12 @@ class StubBot:
         return self._result
 
 
-def build_app(bot, limiter) -> FastAPI:
+def build_app(bot, limiter, metrics: MetricsStore | None = None) -> FastAPI:
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[get_bot] = lambda: bot
     app.dependency_overrides[get_limiter] = lambda: limiter
+    app.dependency_overrides[get_metrics] = lambda: metrics or MetricsStore(FakeRedis(decode_responses=True))
     return app
 
 
@@ -85,10 +91,10 @@ async def redis():
     await client.aclose()
 
 
-async def call(app, **body):
+async def call(app, headers: dict | None = None, **body):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        return await client.post("/chat", json=body)
+        return await client.post("/chat", json=body, headers=headers)
 
 
 # --- the two shapes ---------------------------------------------------------
@@ -104,6 +110,8 @@ async def test_an_answered_turn_comes_back_answered_and_cited(redis):
     assert body["answer"] == "Refunds take five working days."
     assert body["citations"] == ["refund-policy"]
     assert body["conversation_id"]  # minted for us
+    assert body["confidence"] == 0.91
+    assert body["condensed_query"] == "how long does a refund take"
 
 
 @pytest.mark.asyncio
@@ -116,6 +124,8 @@ async def test_an_escalated_turn_is_a_different_shape_entirely(redis):
     assert body["reason"] == "low_confidence"
     assert "answer" not in body
     assert "citations" not in body
+    assert body["confidence"] == 0.02
+    assert body["condensed_query"] == "what is your ceo paid"
 
 
 @pytest.mark.asyncio
@@ -126,6 +136,27 @@ async def test_an_escalation_hands_over_the_evidence(redis):
     body = response.json()
     assert body["retrieved"] == [{"doc_id": "placing-an-order", "title": "Placing an order", "score": 0.02}]
     assert [t["question"] for t in body["history"]] == ["hello"]
+
+
+@pytest.mark.asyncio
+async def test_an_escalation_hands_over_what_the_customer_actually_typed(redis):
+    """Phase 6.1 wants the original query, and the rewrite is not a substitute.
+
+    Condensation is a retrieval device and it can be wrong. Handing an agent only
+    the rewrite would hide the mistake most likely to have caused the escalation -
+    the customer said one thing and we searched for another. Found by Codex during
+    Phase 9: the response carried `condensed_query` and dropped the original.
+    """
+    escalated = replace(
+        ESCALATED,
+        query="how long will it take",
+        condensed_query="how long does a refund for a damaged item take",
+    )
+
+    body = (await call(build_app(StubBot(escalated), generous(redis)), message="q")).json()
+
+    assert body["query"] == "how long will it take"
+    assert body["condensed_query"] == "how long does a refund for a damaged item take"
 
 
 @pytest.mark.asyncio
@@ -184,6 +215,21 @@ async def test_a_rate_limited_turn_never_reaches_the_bot(redis):
 
 
 @pytest.mark.asyncio
+async def test_api_keys_are_limited_independently(redis):
+    """A caller cannot consume another API-key holder's per-caller allowance."""
+    stingy = TurnLimiter(
+        per_minute=RateLimiter(redis, 1, 60, "client-minute"),
+        per_day=RateLimiter(redis, 100, 86_400, "client-day"),
+        upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+    )
+    app = build_app(StubBot(), stingy)
+
+    assert (await call(app, headers={"x-api-key": "first"}, message="one")).status_code == 200
+    assert (await call(app, headers={"x-api-key": "second"}, message="two")).status_code == 200
+    assert (await call(app, headers={"x-api-key": "first"}, message="three")).status_code == 429
+
+
+@pytest.mark.asyncio
 async def test_gemini_refusing_us_is_a_429_and_not_a_500(redis):
     """Their request was fine. We simply cannot serve it this second."""
     bot = StubBot(raises=UpstreamRateLimited(retry_after=30))
@@ -193,3 +239,129 @@ async def test_gemini_refusing_us_is_a_429_and_not_a_500(redis):
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "30"
     assert "limit" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_an_upstream_refusal_is_not_recorded_as_a_completed_turn(redis):
+    metrics = MetricsStore(redis)
+    response = await call(
+        build_app(StubBot(raises=UpstreamRateLimited(retry_after=30)), generous(redis), metrics),
+        message="how long for a refund",
+    )
+
+    assert response.status_code == 429
+    assert (await metrics.snapshot())["turns"] == 0
+
+
+# --- what the turn leaves behind --------------------------------------------
+
+
+async def get(app, path: str, headers: dict | None = None):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.get(path, headers=headers or {})
+
+
+@pytest.mark.asyncio
+async def test_an_answered_turn_is_counted(redis):
+    metrics = MetricsStore(redis)
+    app = build_app(StubBot(ANSWERED), generous(redis), metrics)
+
+    await call(app, message="how long for a refund")
+
+    snapshot = await metrics.snapshot()
+    assert snapshot["turns"] == 1
+    assert snapshot["deflection_rate"] == 1.0
+    assert snapshot["by_category"]["REFUND"]["answered"] == 1
+
+
+@pytest.mark.asyncio
+async def test_an_escalated_turn_is_counted_with_its_reason_and_category(redis):
+    metrics = MetricsStore(redis)
+    app = build_app(StubBot(ESCALATED), generous(redis), metrics)
+
+    await call(app, message="what is your ceo paid")
+
+    snapshot = await metrics.snapshot()
+    assert snapshot["escalation_rate"] == 1.0
+    assert snapshot["escalation_reasons"] == {"low_confidence": 1}
+    assert snapshot["by_category"]["ORDER"]["escalated"] == 1
+
+
+@pytest.mark.asyncio
+async def test_an_escalation_without_chunks_is_returned_and_counted(redis):
+    """A retrieval miss still produces a handoff, just without a category."""
+    metrics = MetricsStore(redis)
+    no_chunks = replace(ESCALATED, chunks=[])
+
+    response = await call(build_app(StubBot(no_chunks), generous(redis), metrics), message="q")
+
+    assert response.status_code == 200
+    assert response.json()["retrieved"] == []
+    snapshot = await metrics.snapshot()
+    assert snapshot["escalation_reasons"] == {"low_confidence": 1}
+    assert snapshot["by_category"] == {}
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limited_turn_is_not_counted_as_a_turn(redis):
+    """It never reached the bot, so it is not a deflection or an escalation.
+
+    Counting refusals as turns would quietly inflate the escalation rate with
+    traffic the bot never saw, and the number would look like a product problem
+    rather than a capacity one.
+    """
+    metrics = MetricsStore(redis)
+    stingy = TurnLimiter(
+        per_minute=RateLimiter(redis, 1, 60, "client-minute"),
+        per_day=RateLimiter(redis, 100, 86_400, "client-day"),
+        upstream=RateLimiter(redis, 100, 60, "upstream-minute"),
+    )
+    app = build_app(StubBot(), stingy, metrics)
+
+    await call(app, message="first")
+    await call(app, message="second")  # 429
+
+    assert (await metrics.snapshot())["turns"] == 1
+
+
+@pytest.mark.asyncio
+async def test_the_metrics_endpoint_reports_the_snapshot(redis):
+    metrics = MetricsStore(redis)
+    app = build_app(StubBot(ANSWERED), generous(redis), metrics)
+    await call(app, message="how long for a refund")
+
+    body = (await get(app, "/admin/metrics")).json()
+
+    assert body["turns"] == 1
+    assert body["deflection_rate"] == 1.0
+    assert body["false_answer_rate"] is None  # and it says why, see test_observability
+
+
+@pytest.fixture
+def admin_key(monkeypatch):
+    """Turn the admin gate on for a test, and reset the cached settings after."""
+    monkeypatch.setenv("ADMIN_API_KEY", "s3cret")
+    get_settings.cache_clear()
+    yield "s3cret"
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_the_metrics_endpoint_is_closed_when_a_key_is_configured(redis, admin_key):
+    """An untested auth check is a decorative one."""
+    app = build_app(StubBot(), generous(redis))
+
+    assert (await get(app, "/admin/metrics")).status_code == 401
+    assert (await get(app, "/admin/metrics", {"x-admin-key": "wrong"})).status_code == 401
+    assert (await get(app, "/admin/metrics", {"x-admin-key": admin_key})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_the_metrics_endpoint_is_open_when_no_key_is_configured(redis):
+    """Fine locally, and the README says not to ship it that way."""
+    get_settings.cache_clear()
+    app = build_app(StubBot(), generous(redis))
+
+    assert (await get(app, "/admin/metrics")).status_code == 200

@@ -47,6 +47,10 @@ class Answered:
     citations: tuple[str, ...]
     confidence: float
     condensed_query: str
+    # The KB category this was answered out of, for the metrics breakdown. Taken
+    # from the best chunk rather than from the citations, because the citations are
+    # doc_ids and the category is what "escalation rate by category" is grouped on.
+    category: str | None = None
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,7 @@ class SupportBot:
             citations=answer.citations,
             confidence=result.confidence,
             condensed_query=condensed,
+            category=result.top.candidate.category if result.top else None,
         )
 
     async def _escalate(

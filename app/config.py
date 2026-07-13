@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     chunk_size_tokens: int = 224
     chunk_overlap_tokens: int = 40
 
+    # When set, /admin/metrics requires it in an X-Admin-Key header. Empty means
+    # open, which is fine locally and is not fine on the internet: the endpoint
+    # exposes no message content, but "how often does this bot fail" is still not a
+    # number to hand out by default.
+    admin_api_key: str = ""
+
     log_level: str = Field(default="INFO")
 
 

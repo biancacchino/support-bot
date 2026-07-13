@@ -51,6 +51,30 @@ Pass a `conversation_id` back to make the next turn a follow-up. Omit it and a n
 
 The escalation carries the retrieved chunks and their scores - the ones that scored *below* the gate. In production that payload belongs in the ticketing system rather than in a customer's browser, but it is returned here because the interesting thing about this bot is what it declines to answer and why, and hiding the evidence would hide the product.
 
+## Observability
+
+Logs are JSON, one object per line, all of them - uvicorn's access lines are routed through the same formatter, because a stream that is half JSON and half prose parses as neither.
+
+Every turn logs one line carrying the request id, conversation id, latency, confidence, category, and whether it escalated:
+
+```json
+{"ts": "2026-07-13T01:48:37+0000", "level": "INFO", "request_id": "5d52f722bbb4",
+ "message": "turn escalated", "conversation_id": "d5b77cdf...", "escalated": true,
+ "reason": "low_confidence", "confidence": 0.0276, "category": "ORDER", "latency_ms": 379.1}
+```
+
+The request id also comes back in the `X-Request-ID` response header, so a customer complaint ("it told me refunds take 30 days") traces to the exact turn, and from there to the exact chunks that were retrieved.
+
+```sh
+curl -s localhost:8000/admin/metrics    # deflection + escalation rates, by category
+```
+
+Set `ADMIN_API_KEY` to require an `X-Admin-Key` header on that endpoint. It exposes no message content, only counts - but "how often does this bot fail" is not a number to leave open to the internet.
+
+**On false-answer rate.** The PRD asks for it and the endpoint returns `null`, on purpose. A false answer is one the bot gave confidently and *wrongly*, and nothing in a request says it was wrong - that needs ground truth or a human saying so. It is produced by the Phase 11 eval against labelled queries, not by live traffic. Reporting a plausible-looking number here, or quietly redefining it as something cheaper to measure, would be worse than reporting nothing: someone would put it in a slide.
+
+Rates are `null` rather than `0` when nothing has happened yet, for the same reason. A 0% deflection rate is an emergency; no traffic is a Tuesday.
+
 ## Rate limiting
 
 Two axes, protecting two different things. Conflating them is how a free tier gets exhausted by callers who were each individually well behaved.
@@ -106,7 +130,7 @@ docker compose exec app python scripts/ask.py --sticky
 
 ## Repo map
 
-- `app/` - FastAPI application. `bot.py` (one turn, end to end - the pipeline everything else calls), `api.py` (`POST /chat`), `ratelimit.py` (per-caller limits + the shared upstream budget), `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `conversation.py` (Redis history + query condensation), `main.py` (entrypoint, `/health`).
+- `app/` - FastAPI application. `bot.py` (one turn, end to end - the pipeline everything else calls), `api.py` (`POST /chat`, `GET /admin/metrics`), `ratelimit.py` (per-caller limits + the shared upstream budget), `observability.py` (JSON logging + the metric counters), `config.py` (env settings), `ingestion.py` (chunk, embed, upsert), `retrieval.py` (stage 1 vector search), `reranker.py` (stage 2 cross-encoder rerank + confidence gate), `llm.py` (grounded answer generation with citations), `conversation.py` (Redis history + query condensation), `main.py` (entrypoint, `/health`).
 - `kb/` - the knowledge base: 25 help-centre documents, each mapped in frontmatter to the Bitext intents it answers.
 - `scripts/` - `ingest.py` (re-ingestion CLI), `check_kb_coverage.py` (corpus vs taxonomy).
 - `docs/` - project documentation, including the derived intent taxonomy.
