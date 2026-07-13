@@ -1,0 +1,320 @@
+{"query": "I do not want purchase", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "i cant afford order", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "question about cancelling purchase", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "is it possible to cancel order?", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "i cannot pay for my last item cancel order", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "need help cancelling purchase", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "icannot afford order could i cancel it", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "I can no longer afford purchase, cancel it", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "I have a problem with canceling purchase", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "I don't know what to do to cancel purchase", "kind": "in_scope", "intent": "cancel_order", "category": "ORDER"}
+{"query": "correct order", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "updating purchase", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "i cannot edit order", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "can I edit order?", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "update order", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "need to swap several items of purchase", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "I have got to edit order, I need assistance", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "remove item from order", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "could i modify oredr", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "I want information about correcting order", "kind": "in_scope", "intent": "change_order", "category": "ORDER"}
+{"query": "assistance to change the address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "help me to edit the delivery address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "how to correct the  shipping address?", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "I have issues modifying the delivery address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "i wanmt help trying to change my shipping address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "could you help me updating the address?", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "problem modifying delivery address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "I have an error updating my fucking shipping address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "I have a question about a shipping address change", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "i cant edit my delivery address", "kind": "in_scope", "intent": "change_shipping_address", "category": "SHIPPING"}
+{"query": "how can I check the early exit fees?", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "want help to check the early termination fees", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "I cannot find the termination fees, I need assistance", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "I wanmt assistance checking the cancellation penalty", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "how to see the early exit charge?", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "i try to check the cancellation fee", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "I need to see the early exit penalties, can I get some help?", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "what are the withdrawal charged?", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "hw can i see the early termination fee", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "I don't know how I can check the withdrawal penalties", "kind": "in_scope", "intent": "check_cancellation_fee", "category": "CANCEL"}
+{"query": "i do not know how to look for my invoice from", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "i dont  know what i have to do to see my bill #85632", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "what do I have to do to give a quick look at invoice #37777?", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "I don't know how I could look for invoice #85632", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "i want help finding my invoice from", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "need help taking a quick look at the bill #37777", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "help me give a quick look at my bill #12588", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "check invoices from December", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "seebill from", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "I lost invoice #00108, will you find it for me?", "kind": "in_scope", "intent": "check_invoice", "category": "INVOICE"}
+{"query": "where do I check the accepted payment methods?", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "I need help listing the available payment options", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "can you tell me your damn payment methods?", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "where to check what payment options are accepted?", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "I need to see the payment options, can you help me?", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "how to see your accepted payment methods?", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "i want assistance to list ur available payment modalities", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "I need to see the available payment modalities", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "I try to list the payment modalities", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "help me seeing what payment options are available", "kind": "in_scope", "intent": "check_payment_methods", "category": "PAYMENT"}
+{"query": "assistance to check ur refund pollicy", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "help me to check in which cases can I ask for refunds", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "I'd like to see how long refunds  take help me", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "I need to check how long the goddamn reimbursements take", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "show me in which situations can i request my money back", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "I want to check in which situations czn I ask for a refund", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "can ushow me ur refund policy", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "I want to see under what circumstances can I request refunds", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "I want to see in what cases can Iask to be refunded", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "are service charges reimbursable?", "kind": "in_scope", "intent": "check_refund_policy", "category": "REFUND"}
+{"query": "where do I open a standard account?", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "new bloody account for father", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "opening new freemium account", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "where to create a pro account?", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "can ya help me to create a platinum account for my fiance", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "I don't have a account, how could I register?", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "what do i have to do to open a account", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "open another freemium account for mum", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "I try to create a pro account for my daughter", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "have problems with creating my standard account", "kind": "in_scope", "intent": "create_account", "category": "ACCOUNT"}
+{"query": "what do I need to do to cancell a account?", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "I never make use of my account, assistance deleting it", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "problems with account cancellations", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "have problems with the removal of a account", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "i want assistance canceling my account", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "I have a question about a freemium account cancellation", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "closing pro account", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "I do not know what to do to remove a premium account", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "cancel acount", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "is it possible to delete my freemium account?", "kind": "in_scope", "intent": "delete_account", "category": "ACCOUNT"}
+{"query": "how to see the shipping methods", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "is it plssible to order from?", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "is it possible toorder from", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "need help to see what shipping methods are there", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "need help to check the shipment methods", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "can ya help me to see what shipment options i can choose", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "i do not know what to do to see what shipping options i have", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "could you help me check what shipment options I have?", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "do you shp to?", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "can you help me to check the methods for shipment?", "kind": "in_scope", "intent": "delivery_options", "category": "DELIVERY"}
+{"query": "need help to see how long it takes for my parcel to arrive", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "could I check how long it takes for my product to arrive?", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "I need assistance tocheck how soon can I expect my purchase", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "need assistance to check when my product is gonna arrive", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "help me see when my item is going to arrive", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "I need help to see how soon can I expect the damn item", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "I call to see when my parcel is going to arrive", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "can ya hepl me see when will my item arrive", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "could you help me to see how soon can I expect the product?", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "can I check how long it takes for the delivery to arrive?", "kind": "in_scope", "intent": "delivery_period", "category": "DELIVERY"}
+{"query": "correct data on account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "modifying info on pro account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "updating info on gold account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "modifying info on account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "I'm trying to correct the info included on my profile", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "updating information on account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "mldifying standard account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "I try to change the fucking personal details", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "updating info on freemium account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "correct details on premium account", "kind": "in_scope", "intent": "edit_account", "category": "ACCOUNT"}
+{"query": "I want help getting bill #85632", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "can you help me get the bills from?", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "get invoices from", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "can you help me getting invoice #37777?", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "getting invoices from June", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "I do not know how to get my invoice from", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "I do not know what to do to download the bill #00108", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "getting bill from", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "can ya help me downloading the bill from", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "i cant find my invoice #12588 can ya mail it to me", "kind": "in_scope", "intent": "get_invoice", "category": "INVOICE"}
+{"query": "wanna ask for a restutution of my money", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "reimbursing dollars", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "how can I ask for a compensation of money?", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "where do I receive a compensation?", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "where do i receive a rewfund of money", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "I do not know what I need to do to get a reimbursement", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "I do not know how to obtain a restitution of my money", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "where to obtain a refund of my money?", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "how long until I obtain a refund of money?", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "I don't know what to do to get a reimbursement", "kind": "in_scope", "intent": "get_refund", "category": "REFUND"}
+{"query": "where do i inform of payment problems", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "i want assistance to solve issues with payment", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "wanna inform of errors with online payment can uhelp me", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "I have to inform of issues with payments", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "i do not know what to do to inform of problems with payments", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "I want assistance informing of a trouble with payment", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "help me solve troubles with payments", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "I have a queston about the payment", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "inform of error with online payments", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "notifying of problems with payments", "kind": "in_scope", "intent": "payment_issue", "category": "PAYMENT"}
+{"query": "I do not know how I can purchase a few of your article", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "can ya help me purchase several items", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "I don't know what I have to do to buy some products", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "I want help ordering a few of your product", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "need to order a few of ur item", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "where can i eanr a few of ur item", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "I have got to earn several of your item, will you help me?", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "I have to purchase several of your item", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "can uhelp me buying an artikcle", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "I am trying to order several of your article", "kind": "in_scope", "intent": "place_order", "category": "ORDER"}
+{"query": "I want help resetting my profile access key", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "i dont know what to do to recover the pwd of my profile", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "i have to reset my user account pwd how cn i do it", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "where do I restore the password of my account?", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "I have to reset the key of my user", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "how do i restore my account passwodr", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "I need help recovering my user key", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "where do i restore the password ofmy account", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "want assistance to retrieve the pin code of my user profile", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "need help to  retrieve my profile pin", "kind": "in_scope", "intent": "recover_password", "category": "ACCOUNT"}
+{"query": "would it be possible to report issues with sign-up", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "I need to inform of registration problems", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "I'd like to notify of a problem with a goddamn signup", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "report problems creating profile", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "I need to report a fucking registration error, help me", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "I cannot open an account, how to report a sign-up issue?", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "reporting issues creating user", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "i cant notify of issues with signup", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "i dont know how to inform of sign-up problems", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "can you help me notifying of a problem with bloody signup ?", "kind": "in_scope", "intent": "registration_problems", "category": "ACCOUNT"}
+{"query": "I have issues entering a secondary delivery address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "i have an error setting up my shipping address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "there is an error submitting the shipping address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "would it be possible to submit a different delivery address?", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "I want help to submit the new delivery address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "i dont know how i can submit my secondary shipping address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "i have a trouble submitting a different shipping address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "help me enter an new shipping address", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "i have got to enter my new deluvery address can ya help me", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "I have got to enter a new shipping address, help me", "kind": "in_scope", "intent": "set_up_shipping_address", "category": "SHIPPING"}
+{"query": "i dont know what i need to do to change to the gold account", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "how can I use the standard profile?", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "where can I change to the standard account?", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "use acdcount", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "I want to use the pro profile, can I get some help?", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "what do i need to do to switch to the pro account", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "i want assistance to change to the account", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "I do not know how I can change to the account", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "I don't know what to do to change to the freemium account", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "wannma change to the account i need help", "kind": "in_scope", "intent": "switch_account", "category": "ACCOUNT"}
+{"query": "assistance to see the ETA of the order", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "I need help to see the current status of order", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "i need assistance to check the eta of the order", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "track order", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "i cannot see the current staus of purchase", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "see order current status", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "eta of order", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "how could I check the current status of order?", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "help me to see the ETA of the purchase", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "wat help to see the ETA of purchase", "kind": "in_scope", "intent": "track_order", "category": "ORDER"}
+{"query": "can you show me the current status of my refund?", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "help me checking if there are any updates on my restitution", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "could you help me see if there are any news on my rebate?", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "I am waiting for a refund of dollars", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "assistance to see if there are any news on the compensation", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "i expect a restitution of has it been prcoessed", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "I expect a refund of dollars", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "I expect a rebate of dollars, was it processed already", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "I expect a rebate of", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "i expect a restitution of", "kind": "in_scope", "intent": "track_refund", "category": "REFUND"}
+{"query": "what do I have to do to lodge a complaint?", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "I'm trying to lodge a customer claim against ur organization", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "where can ilodge a customer reclamation against ur company", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "I have got to make a customer claim against your business", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "I am unsatisfied with your work, how do I lodge a claim?", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "I am calling to make a complaint against your company", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "help to file a consumer claim", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "can you help me make a customer claim against your company?", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "need to file a bloody consumer reclamation how can i do it", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "I want help to lodge an complaint against your company", "kind": "out_of_scope", "intent": "complaint", "category": null}
+{"query": "could I check at what time I can call customer service?", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "can i check at what time i can reach customer support", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "I want to check what hours customer support available is", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "I don't know what to do to call customer support", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "how to see at what time i can contact customer support", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "how to see at what time customer support available is?", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "I want to contact fucking customer support, how can I do it?", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "can I see at what time I can contact customer assistance?", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "is it possible to speak to goddamn customer service?", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "I have to speak with customer support, how to do it?", "kind": "out_of_scope", "intent": "contact_customer_service", "category": null}
+{"query": "I would like to speak to a person", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "I don't know what I need to do to contact an operator", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "i dont know how i ca chat with a human agent", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "help me talk to a agent", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "transfer to live agent", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "i dont know what i need to do to speak to an operator", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "I do not know what to do to speak with an live agent", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "I cannot speak to a goddamn live agent", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "what do i have to do to speak with  somebody", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "i do not know what to do to talk with an operator", "kind": "out_of_scope", "intent": "contact_human_agent", "category": null}
+{"query": "I need assistance unsubscribing to your fucking newsletter", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "i have to subscribe to the corporate newsletter", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "tell me more about canceling my newsletter subscription", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "would it be possible to sign up to the company newsletter?", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "i dont know what i need to do to subscribe to the newsletter", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "cancel the subscription to your corporate newsletter", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "what do I have to do to receive your company newsletter?", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "I cannot receive the fucking newsletter", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "help canceling my company fucking newsletter subscription", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "i have got to cancel the company newsletter subscription", "kind": "out_of_scope", "intent": "newsletter_subscription", "category": null}
+{"query": "is there a section to leave some feedack for ur services", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "I want help to send my feedback about your services", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "is there an address to leave a comment for a service?", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "need to leave a review about ur products how can i do it", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "is there an address to leave a comment for your company?", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "I need to leave feedback, can you help me?", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "help me leaving feedback", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "I have to write an opinion, can I get some help?", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "is there an e-mail to submit an opinion for your services?", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "i call to submit some feedback for ur services", "kind": "out_of_scope", "intent": "review", "category": null}
+{"query": "I would like to reject offers, can I get some help?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "i do not think the fucking settlement is fair i newed help rejecting it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not find it a fair settlement, can I reject it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not find it a fair settlement, help me to reject it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I have to reject fucking settlement offers, can you help me?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would like to reject a fucking settlemet offer, how do I do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not find it a fair offer, will you help me reject it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not find it a fair offer, I want to reject it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "can uhelp me rejecting a fucking settlement", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not think the settlement offer is fair, I need help rejecting it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I got to reject settlements, will you help me?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I don't find it a fair fucking offer, could you help me rejecting it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "how do I reject offers?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would liie to reject fucking offers", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "how can i reject settlements", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would like to reject a fucking settlement, could I get some help?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "i dont think the settlement offer is fairhow can i reject it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "wanna reject a settlement offer how to do it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I want to reject settlement offers, I need assistance", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I don't think the settlement offer is fir, help me reject it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "canh uhelp me to reject a fucking settlement", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "i got to reject an offer how can i do it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I got to reject a fucking offer, could you help me?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "need to rdject a settlement can i get some help", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I have to reject fucking settlement offers, can I get some help?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I'd like to reject settlement offers, where to do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "i haveto reject a fucking settlement offer where can i do it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I don't find it a fair fucking offer, how can I reject it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I'd like  to reject settlement offers", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I have to reject a fucking settlement, could I get some help?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not think the fucking settlement offer is fair, can you help me reject it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I need to reject a fucking settlement, whree can I do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I don't think the fuckong settlement is fair, reject it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "i want assistance to reject a fucking settlement offer", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I'd like to reject a settlemen offer will uhelp me", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not find it a fair offer, can I reject it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "nede to reject fucking settlements how can i do it", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I need to reject a fucking settlement offer, where to do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I have to reject a settlement , how can I do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would like to reject a fucking settlement, how can I do it ?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I got to reject a fucking settlement, where do I do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would like to rdject a fucking settlement, can you help me?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "id like to reject fucking settlements can i get some hgelp", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would like to reject fucking settlement offers, how do I do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "i want help to reject a settlement offer", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "how do i reject settements", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I do not find it a fair settlement, can you help me rejecting it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I would like to reject a fucking settlement offer, could you help me?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "I got to reject a fucking offer, how could I do it?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
+{"query": "is it possible to reject a fucking settlement?", "kind": "out_of_domain", "intent": "reject_settlement", "category": "CLAIMS"}
