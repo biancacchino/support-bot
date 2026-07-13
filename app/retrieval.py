@@ -57,11 +57,6 @@ class Candidate:
         )
 
     @property
-    def source(self) -> str:
-        """How this chunk is cited: the document it came from, not the chunk."""
-        return self.doc_id
-
-    @property
     def passage(self) -> str:
         """The chunk as the reranker should read it, with its context restored.
 
