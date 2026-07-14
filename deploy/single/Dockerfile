@@ -40,15 +40,37 @@ COPY scripts ./scripts
 COPY pytest.ini .
 COPY deploy/single/entrypoint.sh /usr/local/bin/entrypoint.sh
 
-# Pull the embedder and the reranker at build time. A free Space is paused after a
-# spell of inactivity and cold-starts on the next visit - and a recruiter is exactly
-# the visitor who arrives during that cold start. Downloading a few hundred MB of
-# weights then would be the whole first impression.
-RUN python -c "\
+# Pull the embedder and the reranker at build time. The service scales to zero and
+# cold-starts on the next visit - and a recruiter is exactly the visitor who arrives
+# during that cold start. Downloading a few hundred MB of weights then would be the
+# whole first impression.
+#
+# The weights arrive in the build context, already downloaded. They are NOT fetched
+# here, and that is the whole point: Cloud Build cannot reach HuggingFace's Xet
+# storage. Through the bridge CDN it gets a 403 ("invalid key pair id"); through the
+# native client it hangs with no timeout it will honour. Four builds died on that,
+# three of them as silent 25-minute stalls, while the identical step took a minute on
+# a laptop.
+#
+# So the laptop does it. scripts/deploy_cloudrun.sh populates .model-cache/ once and
+# stages it here. The build now has no third-party network dependency at all, which is
+# the property worth having: a deploy should not be able to fail because someone
+# else's CDN is unreachable from someone else's builder.
+#
+# HF_HUB_OFFLINE makes that guarantee enforceable rather than aspirational - if the
+# cache is ever incomplete, this fails loudly at build instead of silently reaching
+# for the network at 3am.
+COPY models /models
+ENV HF_HUB_OFFLINE=1
+
+RUN python -u -c "\
 from app.config import get_settings; \
 from app.retrieval import build_encoder; \
 from app.reranker import build_cross_encoder; \
-s = get_settings(); build_encoder(s); build_cross_encoder(s)"
+s = get_settings(); \
+print('loading embedder from cache', flush=True); build_encoder(s); \
+print('loading reranker from cache', flush=True); build_cross_encoder(s); \
+print('weights present', flush=True)"
 
 RUN useradd --create-home --uid 1000 appuser \
     && chmod +x /usr/local/bin/entrypoint.sh \

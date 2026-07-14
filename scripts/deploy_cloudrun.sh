@@ -28,6 +28,30 @@ trap 'rm -rf "$staging"' EXIT
 git -C "$root" archive HEAD | tar -x -C "$staging"
 cp "$root/deploy/single/Dockerfile" "$staging/Dockerfile"
 
+# The model weights ride along in the build context, because Cloud Build cannot reach
+# HuggingFace's Xet storage and the build must not depend on it - see the Dockerfile.
+# Fetched once into .model-cache/ (gitignored) and reused by every later deploy. Done
+# in a container so it needs no local Python: the .venv here is 3.14, where the app's
+# own dependencies do not install.
+cache="$root/.model-cache"
+if [ ! -d "$cache/hub" ]; then
+  echo "fetching model weights once into .model-cache/ ..."
+  mkdir -p "$cache"
+  # allow_patterns, or this is 1.8GB. Both repos ship the same weights five times over
+  # - ONNX, OpenVINO, TensorFlow, a PyTorch .bin - and sentence-transformers loads the
+  # safetensors and the tokenizer. Everything else is 1.6GB of build context uploaded
+  # on every deploy to be ignored at load.
+  docker run --rm -v "$cache:/models" -e HF_HOME=/models python:3.12-slim sh -c "
+    pip install --quiet --no-cache-dir huggingface_hub hf_xet &&
+    python -c \"
+from huggingface_hub import snapshot_download
+keep = ['*.json', '*.txt', 'model.safetensors', '1_Pooling/*']
+for repo in ('sentence-transformers/all-MiniLM-L6-v2', 'cross-encoder/ms-marco-MiniLM-L-6-v2'):
+    snapshot_download(repo, allow_patterns=keep)
+\""
+fi
+cp -R "$cache" "$staging/models"
+
 cd "$staging"
 
 # Build and deploy are two commands, not `--source`, for one reason: `--source` builds
@@ -38,7 +62,19 @@ cd "$staging"
 PROJECT=$(gcloud config get-value project 2>/dev/null)
 IMAGE="$REGION-docker.pkg.dev/$PROJECT/cloud-run-source-deploy/$SERVICE"
 
-gcloud builds submit . --region "$REGION" --timeout 30m --tag "$IMAGE"
+# The default builder is one slow vCPU, and it spent a full 30 minutes on the torch
+# install without reaching the model warm-up. Every build starts from an empty layer
+# cache, so that cost is paid in full every time - there is no warm second run to look
+# forward to. 8 vCPUs turn it into a coffee break.
+#
+# This forfeits the free tier's 120 build-minutes/day, which only apply to the default
+# machine: roughly $0.15 a build, billed when deploying and never while the demo runs.
+# The free alternative is this machine removed and --timeout 60m, at 40 minutes a deploy.
+gcloud builds submit . \
+  --region "$REGION" \
+  --timeout 30m \
+  --machine-type e2-highcpu-8 \
+  --tag "$IMAGE"
 
 gcloud run deploy "$SERVICE" \
   --image "$IMAGE" \
