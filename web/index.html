@@ -35,7 +35,7 @@
 
   /* Sides carry the speaker, the way a messaging app does: you on the right, the bot
      on the left. Surface tells them apart, not colour - the accent is owed elsewhere. */
-  #log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
+  #log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
   #log:empty { margin-bottom: 0; }
   .turn { display: flex; }
   .turn.user { justify-content: flex-end; }
@@ -90,14 +90,21 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button:disabled { opacity: 0.45; cursor: default; }
 
+  /* Only there when there's a chat to start over from. */
+  #toolbar { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+  #log:empty + #toolbar { display: none; }
+
   /* Quiet links, not chips. They are an invitation, not a control panel. */
   .examples { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 18px; }
+  #toolbar button,
   .examples button {
     background: none; border: none; padding: 0; border-radius: 0;
     color: var(--muted); font-size: 14px; font-weight: 400;
     text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px;
   }
+  #toolbar button:hover,
   .examples button:hover { color: var(--text); text-decoration-color: var(--accent); }
+  #toolbar button:focus-visible,
   .examples button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   footer {
@@ -122,6 +129,10 @@
   </header>
 
   <div id="log" aria-live="polite"></div>
+
+  <div id="toolbar">
+    <button type="button" id="refresh">Start a new conversation</button>
+  </div>
 
   <form id="composer">
     <input id="message" placeholder="Ask about an order, a refund, a return..." autocomplete="off" required maxlength="2000">
@@ -246,6 +257,14 @@ form.addEventListener("submit", (e) => {
 document.querySelectorAll(".examples button").forEach((b) =>
   b.addEventListener("click", () => ask(b.dataset.ask))
 );
+
+// Dropping the id is the reset: the next question mints a fresh conversation server-side,
+// and the old one expires on its own. No page reload, so a slow cold start is not paid twice.
+document.getElementById("refresh").addEventListener("click", () => {
+  log.replaceChildren();
+  conversationId = null;
+  input.focus();
+});
 </script>
 </body>
 </html>
