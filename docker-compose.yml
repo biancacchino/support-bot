@@ -17,6 +17,9 @@ services:
       # against edited docs. Bind-mounting means editing a doc and re-running
       # the ingest script picks it up without a rebuild.
       - ./kb:/srv/kb:ro
+      # Same reasoning for the demo page: it is one static file, and a rebuild
+      # per CSS edit is a silly price for a reload.
+      - ./web:/srv/web:ro
     depends_on:
       qdrant:
         condition: service_started

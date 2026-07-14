@@ -5,75 +5,120 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Northwind Support Bot</title>
 <style>
+  /* One theme, committed to. A demo that renders as two mediocre themes reads worse
+     than one that picks a room and stands in it. */
   :root {
-    --bg: #0f1115;
-    --panel: #171a21;
-    --line: #262b36;
-    --text: #e6e8ec;
-    --muted: #8b93a3;
-    --user: #2b3242;
-    --accent: #7aa2f7;
-    --warn: #e0af68;
-  }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f6f7f9; --panel: #fff; --line: #e3e6eb; --text: #1a1d23;
-      --muted: #6b7280; --user: #e8ecf4; --accent: #3b6fd4; --warn: #b7791f;
-    }
+    --bg: #0b0b0c;
+    --panel: #121214;
+    --mine: #26262b;
+    --text: #f1efeb;
+    --muted: #8a8781;
+    --line: #232326;
+    --accent: #2dd4bf;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-    display: flex; justify-content: center; padding: 32px 16px;
+    font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex; justify-content: center; padding: 72px 24px 96px;
   }
-  main { width: 100%; max-width: 720px; }
-  header { margin-bottom: 20px; }
-  h1 { font-size: 19px; margin: 0 0 6px; letter-spacing: -0.01em; }
-  header p { margin: 0; color: var(--muted); font-size: 14px; }
-  #log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+  main { width: 100%; max-width: 640px; }
+
+  header { margin-bottom: 48px; }
+  h1 {
+    font-size: 34px; line-height: 1.15; font-weight: 600; letter-spacing: -0.025em;
+    margin: 0 0 14px;
+  }
+  .lede { margin: 0; color: var(--text); font-size: 17px; max-width: 34em; }
+  .fineprint { margin: 14px 0 0; color: var(--muted); font-size: 13.5px; max-width: 34em; }
+
+  /* Sides carry the speaker, the way a messaging app does: you on the right, the bot
+     on the left. Surface tells them apart, not colour - the accent is owed elsewhere. */
+  #log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
+  #log:empty { margin-bottom: 0; }
   .turn { display: flex; }
   .turn.user { justify-content: flex-end; }
   .bubble {
-    max-width: 85%; padding: 12px 14px; border-radius: 12px;
+    max-width: 78%; padding: 13px 16px; border-radius: 16px;
     background: var(--panel); border: 1px solid var(--line);
   }
-  .turn.user .bubble { background: var(--user); border-color: transparent; }
-  .bubble p { margin: 0 0 8px; }
+  .turn.user .bubble { background: var(--mine); border-color: transparent; border-bottom-right-radius: 5px; }
+  .turn.bot .bubble { border-bottom-left-radius: 5px; }
+  .bubble p { margin: 0 0 12px; }
   .bubble p:last-child { margin-bottom: 0; }
-  .meta {
-    margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line);
-    font-size: 12.5px; color: var(--muted);
+
+  /* The escalation is the point of the demo and it carries a table. A bubble at 78%
+     would strangle it, so it breaks out and takes the full column. */
+  .turn:has(.tag.escalated) .bubble {
+    max-width: 100%; flex: 1; border-radius: 12px; padding: 18px 20px;
   }
+
   .tag {
-    display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
-    text-transform: uppercase; padding: 2px 7px; border-radius: 5px; margin-bottom: 9px;
+    display: block; margin-bottom: 11px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
   }
-  .tag.answered { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
-  .tag.escalated { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
-  .scores { margin: 6px 0 0; padding: 0; list-style: none; }
-  .scores li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
-  form { display: flex; gap: 8px; }
-  input, button {
-    font: inherit; border-radius: 9px; border: 1px solid var(--line); padding: 11px 13px;
+  /* The accent is spent on the escalation, not the answer. A bot that answers is a
+     bot working; a bot that refuses to guess is the thing this demo is here to show. */
+  .tag.answered { color: var(--muted); }
+  .tag.escalated { color: var(--accent); }
+
+  .meta {
+    margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
   }
-  input { flex: 1; background: var(--panel); color: var(--text); }
-  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  button { background: var(--accent); color: #fff; border-color: transparent; cursor: pointer; font-weight: 600; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .examples { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+  .scores { margin: 12px 0 0; padding: 0; list-style: none; }
+  .scores li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 24px;
+    padding: 8px 0; border-top: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  .scores li span:last-child { color: var(--text); opacity: 0.75; }
+
+  form { display: flex; gap: 10px; }
+  input, button { font: inherit; border-radius: 6px; padding: 12px 14px; border: 1px solid var(--line); }
+  input {
+    flex: 1; background: transparent; color: var(--text);
+  }
+  input::placeholder { color: var(--muted); opacity: 0.7; }
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  button {
+    background: var(--accent); color: #0b0b0c; border-color: transparent;
+    cursor: pointer; font-weight: 600;
+  }
+  button:hover { background: #5eead4; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  /* Quiet links, not chips. They are an invitation, not a control panel. */
+  .examples { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 18px; }
   .examples button {
-    background: transparent; color: var(--muted); border-color: var(--line);
-    font-size: 13px; font-weight: 400; padding: 6px 10px;
+    background: none; border: none; padding: 0; border-radius: 0;
+    color: var(--muted); font-size: 14px; font-weight: 400;
+    text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px;
   }
+  .examples button:hover { color: var(--text); text-decoration-color: var(--accent); }
+  .examples button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  footer {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 18px;
+    font-size: 13.5px; color: var(--muted);
+  }
+  footer a {
+    color: var(--muted); text-decoration: underline;
+    text-decoration-color: var(--line); text-underline-offset: 4px;
+  }
+  footer a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+  footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Northwind Support Bot</h1>
-    <p>Answers from a help-centre knowledge base, and escalates to a human when it isn't confident. It shows you which it did, and why.</p>
-    <p style="margin-top:8px;font-size:13px;">A demo for a fictional wholesaler. What you type is sent to Google Gemini to be answered and kept for an hour so follow-up questions work, so don't paste anything real.</p>
+    <p class="lede">Answers from a help-centre knowledge base, and escalates to a human when it isn't confident. It shows you which it did, and why.</p>
+    <p class="fineprint">A demo for a fictional wholesaler. What you type is sent to Google Gemini to be answered and kept for an hour so follow-up questions work, so don't paste anything real.</p>
   </header>
 
   <div id="log" aria-live="polite"></div>
@@ -88,6 +133,11 @@
     <button type="button" data-ask="how long until my refund shows up">how long until my refund shows up</button>
     <button type="button" data-ask="do you sell replacement parts for a 1994 tractor">something the KB can't answer</button>
   </div>
+
+  <footer>
+    <span>Built by <a href="https://biancajavier.dev" target="_blank" rel="noopener">Bianca Javier</a></span>
+    <a href="https://github.com/biancacchino/support-bot" target="_blank" rel="noopener">Source on GitHub</a>
+  </footer>
 </main>
 
 <script>
@@ -110,10 +160,12 @@ function bubble(who, html) {
 
 // The escalation is the point of the demo, so it renders as its own shape: no answer
 // to show, and instead the evidence for why the bot declined.
-// Scores off the cross-encoder span orders of magnitude, and a near-miss at 0.19 and
-// a nonsense match at 0.000013 both round to "0.00". The reader is here to see the
-// difference between those two, so small scores keep a significant figure.
-const score = (n) => (n >= 0.01 ? n.toFixed(2) : n.toExponential(1));
+// Scores off the cross-encoder span orders of magnitude, and the reader is a customer,
+// not an ML engineer: "1.3e-5" tells them nothing. A rounded percentage tells them the
+// one thing they came for, which is how sure the bot was. The near-miss worth seeing
+// (0.19) still reads as 19%, and a wall of "under 1%" is an honest picture of a
+// question the knowledge base cannot touch.
+const score = (n) => (n < 0.01 ? "under 1%" : `${Math.round(n * 100)}%`);
 
 // The bot escalates for three different reasons and they are not the same event. A
 // single "sorry, a human will help" would flatten the one thing worth showing here.

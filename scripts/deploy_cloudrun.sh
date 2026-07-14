@@ -29,8 +29,19 @@ git -C "$root" archive HEAD | tar -x -C "$staging"
 cp "$root/deploy/single/Dockerfile" "$staging/Dockerfile"
 
 cd "$staging"
+
+# Build and deploy are two commands, not `--source`, for one reason: `--source` builds
+# on Cloud Build's 10-minute default timeout, and this image cannot be built in ten
+# minutes. Installing torch and baking two models in takes longer than that, and the
+# failure is a bare DEADLINE_EXCEEDED that says nothing about which of the two clocks
+# ran out. Naming the timeout makes the constraint visible instead of mysterious.
+PROJECT=$(gcloud config get-value project 2>/dev/null)
+IMAGE="$REGION-docker.pkg.dev/$PROJECT/cloud-run-source-deploy/$SERVICE"
+
+gcloud builds submit . --region "$REGION" --timeout 30m --tag "$IMAGE"
+
 gcloud run deploy "$SERVICE" \
-  --source . \
+  --image "$IMAGE" \
   --region "$REGION" \
   --allow-unauthenticated \
   --port 8000 \

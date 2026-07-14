@@ -29,6 +29,7 @@ Ingestion is idempotent. Chunk IDs are derived from the document, so re-running 
 Then open `localhost:8000` for the chat page.
 It is one static file (`web/index.html`), served by the app itself, and it is a demo front end for the API rather than a second product.
 It renders an escalation as its own shape - no answer, and instead the documents that lost and the scores they lost with - because what this bot declines to answer is the interesting half of it.
+`web/` is bind-mounted like `kb/`, so editing the page and reloading the browser is enough. No rebuild.
 
 ## Deploy the demo
 
