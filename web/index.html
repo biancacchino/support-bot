@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind Support Bot</title>
+<style>
+  /* One theme, committed to. A demo that renders as two mediocre themes reads worse
+     than one that picks a room and stands in it. */
+  :root {
+    --bg: #0b0b0c;
+    --panel: #121214;
+    --mine: #26262b;
+    --text: #f1efeb;
+    --muted: #8a8781;
+    --line: #232326;
+    --accent: #2dd4bf;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex; justify-content: center; padding: 72px 24px 96px;
+  }
+  main { width: 100%; max-width: 640px; }
+
+  header { margin-bottom: 48px; }
+  h1 {
+    font-size: 34px; line-height: 1.15; font-weight: 600; letter-spacing: -0.025em;
+    margin: 0 0 14px;
+  }
+  .lede { margin: 0; color: var(--text); font-size: 17px; max-width: 34em; }
+  .fineprint { margin: 14px 0 0; color: var(--muted); font-size: 13.5px; max-width: 34em; }
+
+  /* Sides carry the speaker, the way a messaging app does: you on the right, the bot
+     on the left. Surface tells them apart, not colour - the accent is owed elsewhere. */
+  #log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+  #log:empty { margin-bottom: 0; }
+  .turn { display: flex; }
+  .turn.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%; padding: 13px 16px; border-radius: 16px;
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  .turn.user .bubble { background: var(--mine); border-color: transparent; border-bottom-right-radius: 5px; }
+  .turn.bot .bubble { border-bottom-left-radius: 5px; }
+  .bubble p { margin: 0 0 12px; }
+  .bubble p:last-child { margin-bottom: 0; }
+
+  /* The escalation is the point of the demo and it carries a table. A bubble at 78%
+     would strangle it, so it breaks out and takes the full column. */
+  .turn:has(.tag.escalated) .bubble {
+    max-width: 100%; flex: 1; border-radius: 12px; padding: 18px 20px;
+  }
+
+  .tag {
+    display: block; margin-bottom: 11px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+  }
+  /* The accent is spent on the escalation, not the answer. A bot that answers is a
+     bot working; a bot that refuses to guess is the thing this demo is here to show. */
+  .tag.answered { color: var(--muted); }
+  .tag.escalated { color: var(--accent); }
+
+  .meta {
+    margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  .scores { margin: 12px 0 0; padding: 0; list-style: none; }
+  .scores li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 24px;
+    padding: 8px 0; border-top: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  .scores li span:last-child { color: var(--text); opacity: 0.75; }
+
+  form { display: flex; gap: 10px; }
+  input, button { font: inherit; border-radius: 6px; padding: 12px 14px; border: 1px solid var(--line); }
+  input {
+    flex: 1; background: transparent; color: var(--text);
+  }
+  input::placeholder { color: var(--muted); opacity: 0.7; }
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  button {
+    background: var(--accent); color: #0b0b0c; border-color: transparent;
+    cursor: pointer; font-weight: 600;
+  }
+  button:hover { background: #5eead4; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  /* Only there when there's a chat to start over from. */
+  #toolbar { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+  #log:empty + #toolbar { display: none; }
+
+  /* Quiet links, not chips. They are an invitation, not a control panel. */
+  .examples { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 18px; }
+  #toolbar button,
+  .examples button {
+    background: none; border: none; padding: 0; border-radius: 0;
+    color: var(--muted); font-size: 14px; font-weight: 400;
+    text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px;
+  }
+  #toolbar button:hover,
+  .examples button:hover { color: var(--text); text-decoration-color: var(--accent); }
+  #toolbar button:focus-visible,
+  .examples button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  footer {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 18px;
+    font-size: 13.5px; color: var(--muted);
+  }
+  footer a {
+    color: var(--muted); text-decoration: underline;
+    text-decoration-color: var(--line); text-underline-offset: 4px;
+  }
+  footer a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+  footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Northwind Support Bot</h1>
+    <p class="lede">Answers from a help-centre knowledge base, and escalates to a human when it isn't confident. It shows you which it did, and why.</p>
+    <p class="fineprint">A demo for a fictional wholesaler. What you type is sent to Google Gemini to be answered and kept for an hour so follow-up questions work, so don't paste anything real.</p>
+  </header>
+
+  <div id="log" aria-live="polite"></div>
+
+  <div id="toolbar">
+    <button type="button" id="refresh">Start a new conversation</button>
+  </div>
+
+  <form id="composer">
+    <input id="message" placeholder="Ask about an order, a refund, a return..." autocomplete="off" required maxlength="2000">
+    <button type="submit">Send</button>
+  </form>
+
+  <div class="examples">
+    <button type="button" data-ask="where is my order right now">where is my order right now</button>
+    <button type="button" data-ask="how long until my refund shows up">how long until my refund shows up</button>
+    <button type="button" data-ask="do you sell replacement parts for a 1994 tractor">something the KB can't answer</button>
+  </div>
+
+  <footer>
+    <span>Built by <a href="https://biancajavier.dev" target="_blank" rel="noopener">Bianca Javier</a></span>
+    <a href="https://github.com/biancacchino/support-bot" target="_blank" rel="noopener">Source on GitHub</a>
+  </footer>
+</main>
+
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("composer");
+const input = document.getElementById("message");
+const button = form.querySelector("button");
+let conversationId = null;
+
+const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function bubble(who, html) {
+  const turn = document.createElement("div");
+  turn.className = `turn ${who}`;
+  turn.innerHTML = `<div class="bubble">${html}</div>`;
+  log.append(turn);
+  turn.scrollIntoView({ behavior: "smooth", block: "end" });
+  return turn;
+}
+
+// The escalation is the point of the demo, so it renders as its own shape: no answer
+// to show, and instead the evidence for why the bot declined.
+// Scores off the cross-encoder span orders of magnitude, and the reader is a customer,
+// not an ML engineer: "1.3e-5" tells them nothing. A rounded percentage tells them the
+// one thing they came for, which is how sure the bot was. The near-miss worth seeing
+// (0.19) still reads as 19%, and a wall of "under 1%" is an honest picture of a
+// question the knowledge base cannot touch.
+const score = (n) => (n < 0.01 ? "under 1%" : `${Math.round(n * 100)}%`);
+
+// The bot escalates for three different reasons and they are not the same event. A
+// single "sorry, a human will help" would flatten the one thing worth showing here.
+const WHY = {
+  low_confidence:
+    "Nothing in the knowledge base answers this well enough to be worth saying, so it goes to an agent instead of guessing.",
+  ungrounded:
+    "The model wrote an answer it could not point at a document for, so it was refused rather than served. A confident invention is the worst failure available here.",
+  human_owned:
+    "This conversation already belongs to a human agent, so the rest of it does too. The bot does not talk over someone mid-reply.",
+};
+
+function render(data) {
+  const confidence = `confidence ${score(data.confidence)}`;
+
+  if (data.status === "answered") {
+    const cites = (data.citations ?? []).map(escape).join(", ");
+    return `<span class="tag answered">Answered</span>
+      <p>${escape(data.answer).replace(/\n+/g, "</p><p>")}</p>
+      <div class="meta">${confidence} &middot; from ${cites || "no citation"}</div>`;
+  }
+
+  // The API returns chunks, and two chunks of one document are two rows saying the
+  // same thing. The reader wants the documents that lost, each once, best score first.
+  const best = new Map();
+  for (const s of data.retrieved ?? []) {
+    if (!best.has(s.doc_id) || best.get(s.doc_id).score < s.score) best.set(s.doc_id, s);
+  }
+  const scores = [...best.values()]
+    .sort((a, b) => b.score - a.score)
+    .map((s) => `<li><span>${escape(s.title)}</span><span>${score(s.score)}</span></li>`)
+    .join("");
+
+  return `<span class="tag escalated">Escalated to a human</span>
+    <p>${WHY[data.reason] ?? WHY.low_confidence}</p>
+    <div class="meta">${confidence} &middot; closest documents:
+      <ul class="scores">${scores}</ul>
+    </div>`;
+}
+
+async function ask(message) {
+  if (!message.trim()) return;
+  bubble("user", `<p>${escape(message)}</p>`);
+  input.value = "";
+  button.disabled = true;
+  const pending = bubble("bot", `<p style="color:var(--muted)">Thinking...</p>`);
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message, conversation_id: conversationId }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const wait = data.retry_after_seconds;
+      pending.querySelector(".bubble").innerHTML =
+        `<p>${escape(data.detail ?? "Something went wrong.")}${wait ? ` Try again in ${wait}s.` : ""}</p>`;
+      return;
+    }
+
+    conversationId = data.conversation_id;
+    pending.querySelector(".bubble").innerHTML = render(data);
+  } catch {
+    pending.querySelector(".bubble").innerHTML = `<p>Could not reach the bot.</p>`;
+  } finally {
+    button.disabled = false;
+    input.focus();
+  }
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  ask(input.value);
+});
+
+document.querySelectorAll(".examples button").forEach((b) =>
+  b.addEventListener("click", () => ask(b.dataset.ask))
+);
+
+// Dropping the id is the reset: the next question mints a fresh conversation server-side,
+// and the old one expires on its own. No page reload, so a slow cold start is not paid twice.
+document.getElementById("refresh").addEventListener("click", () => {
+  log.replaceChildren();
+  conversationId = null;
+  input.focus();
+});
+</script>
+</body>
+</html>

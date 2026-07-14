@@ -6,3 +6,6 @@ venv/
 .pytest_cache/
 .ruff_cache/
 .DS_Store
+
+# Model weights, fetched once and staged into the deploy build context.
+.model-cache/
