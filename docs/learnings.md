@@ -29,6 +29,33 @@ The honest caveat, from the same eval: the cross-encoder is a good ranker and a 
 Sigmoid-squashing a raw logit does not make it a probability, and the threshold is being read as one.
 Calibrating it properly (Platt scaling, on the labelled eval set that now exists) is the next thing worth doing.
 
+## The two worst intents are the eval's problem, not the KB's
+
+The by-intent table names `place_order` and `check_cancellation_fee` as the weakest two, and the obvious next move is to rewrite them the way the three delivery and refund docs were rewritten.
+Tracing every one of their twenty queries through the pipeline says not to.
+
+`check_cancellation_fee` is the clear case.
+The one query phrased in the KB's own terms, "i try to check the cancellation fee", scores 0.99 with all four chunks from `cancellation-fees`.
+The other nine ask about "early exit fees", "early termination fees" and "withdrawal penalties", which is subscription and contract-exit language from Bitext's telecom origin.
+Northwind is a wholesale food supplier, and its cancellation fee is a restocking charge on an order that has started picking, not an early-termination penalty on a contract.
+The cross-encoder scores those nine near zero even when it has retrieved `cancellation-fees` at rank 1, and they escalate.
+That is the right answer.
+Adding "early termination" vocabulary to the document to lift the scores would make the bot confidently answer questions Northwind cannot answer, which is a worse failure than sending them to a human.
+
+`place_order` is retrieved correctly for eight of ten, but every document scores near zero because the queries are informal and misspelled, like "can uhelp me buying an artikcle" and "where can i eanr a few of ur item".
+Low scores escalate, and nothing here clears the 0.2 gate, so no document edit changes the deflection number.
+An additive edit could nudge the ranking, but a rank change on ten queries is inside the noise, and half the miss is genuinely garbled input a human should see anyway.
+
+The lesson is that a low MRR on ten queries is not automatically a coverage gap.
+The delivery and refund intents were fixable because retrieval was missing the document; these two are not, because retrieval finds the document and the gate is right to distrust the match.
+
+## One negative in a hundred clears the gate, and it is a near-collision
+
+The eval leaks one out-of-domain query: "how do I reject offers?", a Bitext insurance settlement-rejection intent.
+It scores 0.35 against `cancelling-an-order`, because that document says "Tell the driver you are rejecting the consignment", and "reject offers" lands close to "reject a delivery".
+It is inside the target and left as a known near-collision rather than chased.
+Tightening the gate enough to catch it would cost deflection on the genuine cancel-order queries that sit just above it, and one semantic collision at 0.35 is a cheaper thing to write down than to design around.
+
 ## Only the reranker is allowed to judge
 
 Retrieval is two stages.
